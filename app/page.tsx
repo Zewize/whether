@@ -1,8 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-
-import { getSupabase } from "@/lib/supabase";
-import type { Profile } from "@/lib/supabase";
+import type { UserProfile } from "@/lib/sheets";
 
 // ─── LOGIC ────────────────────────────────────────────────────────────────────
 function calcAge(birthdate: string) {
@@ -50,10 +48,8 @@ async function detectCity(): Promise<string> {
     if (!navigator.geolocation) return reject(new Error("geolocation_unsupported"));
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        try {
-          const city = await getCityFromCoords(pos.coords.latitude, pos.coords.longitude);
-          resolve(city);
-        } catch { reject(new Error("geocode_failed")); }
+        try { resolve(await getCityFromCoords(pos.coords.latitude, pos.coords.longitude)); }
+        catch { reject(new Error("geocode_failed")); }
       },
       () => reject(new Error("location_denied"))
     );
@@ -111,16 +107,15 @@ function FieldWrap({ label, error, required, children }: { label: string; error?
   );
 }
 
-function TextInput({ value, onChange, type="text", placeholder, unit, ltr, error, disabled }: {
+function TextInput({ value, onChange, type="text", placeholder, unit, ltr, error }: {
   value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
-  unit?: string; ltr?: boolean; error?: string; disabled?: boolean;
+  unit?: string; ltr?: boolean; error?: string;
 }) {
   const [focused, setFocused] = useState(false);
   return (
     <div style={{ position:"relative" }}>
       <input
-        type={type} value={value} onChange={e=>onChange(e.target.value)}
-        placeholder={placeholder} disabled={disabled}
+        type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
         max={type==="date" ? new Date().toISOString().split("T")[0] : undefined}
         onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}
         style={{
@@ -131,7 +126,6 @@ function TextInput({ value, onChange, type="text", placeholder, unit, ltr, error
           outline:"none", transition:"border-color .2s",
           direction: ltr?"ltr":"rtl", textAlign: ltr?"left":"right",
           WebkitAppearance:"none",
-          opacity: disabled ? 0.5 : 1,
         }}
       />
       {unit && <span style={{ position:"absolute", left:13, top:"50%", transform:"translateY(-50%)", color:"rgba(255,255,255,0.25)", fontSize:12, pointerEvents:"none" }}>{unit}</span>}
@@ -139,22 +133,19 @@ function TextInput({ value, onChange, type="text", placeholder, unit, ltr, error
   );
 }
 
-function PrimaryBtn({ onClick, disabled, loading, children }: { onClick: () => void; disabled?: boolean; loading?: boolean; children: React.ReactNode }) {
+function PrimaryBtn({ onClick, loading, children }: { onClick: () => void; loading?: boolean; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} disabled={disabled || loading} style={{
+    <button onClick={onClick} disabled={loading} style={{
       width:"100%", padding:"16px", border:"none", borderRadius:14,
-      background: (disabled || loading) ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#F4A261,#E85D04)",
-      color: (disabled || loading) ? "rgba(255,255,255,0.35)" : "#fff",
-      fontSize:16, fontWeight:800, cursor: (disabled || loading) ? "not-allowed" : "pointer",
+      background: loading ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#F4A261,#E85D04)",
+      color: loading ? "rgba(255,255,255,0.35)" : "#fff",
+      fontSize:16, fontWeight:800, cursor: loading ? "not-allowed" : "pointer",
       fontFamily:"inherit", transition:"all .25s",
-      boxShadow: (disabled || loading) ? "none" : "0 8px 28px rgba(244,162,97,0.4)",
+      boxShadow: loading ? "none" : "0 8px 28px rgba(244,162,97,0.4)",
       display:"flex", alignItems:"center", justifyContent:"center", gap:12,
     }}>
       {loading ? (
-        <>
-          <span style={{ width:18, height:18, borderRadius:"50%", border:"2.5px solid rgba(255,255,255,0.15)", borderTopColor:"#F4A261", display:"inline-block", animation:"spin .7s linear infinite" }} />
-          טוען...
-        </>
+        <><span style={{ width:18, height:18, borderRadius:"50%", border:"2.5px solid rgba(255,255,255,0.15)", borderTopColor:"#F4A261", display:"inline-block", animation:"spin .7s linear infinite" }} />טוען...</>
       ) : children}
     </button>
   );
@@ -192,13 +183,13 @@ function ResultCard({ result, name, onReset, onCopy, copied }: { result: Weather
         <div style={{ position:"relative", zIndex:1, textAlign:"center" }}>
           <div style={{ fontSize:54, filter:"drop-shadow(0 4px 16px rgba(0,0,0,0.35))", animation:"float 3s ease-in-out infinite" }}>{rec.emoji}</div>
           <div style={{ fontSize:76, fontWeight:900, color:"#fff", lineHeight:1, textShadow:"0 4px 28px rgba(0,0,0,0.45)", marginTop:4 }}>{feelTemp}°</div>
-          <div style={{ fontSize:16, color:"rgba(255,255,255,0.9)", fontWeight:700, textShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>{rec.label}</div>
+          <div style={{ fontSize:16, color:"rgba(255,255,255,0.9)", fontWeight:700 }}>{rec.label}</div>
           <div style={{ fontSize:13, color:"rgba(255,255,255,0.6)", marginTop:6 }}>{weather.cityHe} · {dateStr}</div>
         </div>
       </div>
 
       <div style={{ background:"rgba(0,0,0,0.55)", backdropFilter:"blur(12px)", padding:"12px 20px", display:"flex", justifyContent:"space-around", borderRight:`4px solid ${rec.color}` }}>
-        {([["מינ׳",`${weather.min}°`],["ממוצע",`${weather.avg}°`],["מקס׳",`${weather.max}°`],["תחושה אישית",`${feelTemp}°`]] as [string,string][]).map(([l,v],i)=>(
+        {([["מינ׳",`${weather.min}°`],["ממוצע",`${weather.avg}°`],["מקס׳",`${weather.max}°`],["תחושה",`${feelTemp}°`]] as [string,string][]).map(([l,v],i)=>(
           <div key={l} style={{ textAlign:"center" }}>
             <div style={{ fontSize:10, color:"rgba(255,255,255,0.45)", letterSpacing:"0.07em", textTransform:"uppercase" }}>{l}</div>
             <div style={{ fontSize:20, fontWeight:800, color: i===3 ? rec.color : "#fff" }}>{v}</div>
@@ -209,32 +200,29 @@ function ResultCard({ result, name, onReset, onCopy, copied }: { result: Weather
       <div style={{ background:"#0f1923", padding:"20px 22px 26px", borderRadius:"0 0 24px 24px" }}>
         <div style={{ background:"rgba(255,255,255,0.04)", border:`1px solid ${rec.color}44`, borderRadius:16, padding:"14px 16px", marginBottom:14 }}>
           <div style={{ fontSize:10, color:rec.color, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, marginBottom:6 }}>👕 המלצת לבוש למחר</div>
-          <div style={{ fontSize:15, color:"#f0f0f0", lineHeight:1.65, fontWeight:500 }}>{rec.clothes}</div>
+          <div style={{ fontSize:15, color:"#f0f0f0", lineHeight:1.65 }}>{rec.clothes}</div>
         </div>
-
         <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
-          <div style={{ fontSize:10, color:"#445", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>ניתוח פיזיולוגי אישי</div>
+          <div style={{ fontSize:10, color:"#445", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>ניתוח פיזיולוגי</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:6, alignItems:"center" }}>
             <Chip label="מגדר" value={genderOffset} />
             <Chip label={`BMI ${parseFloat(bmi).toFixed(1)}`} value={bmiOffset} />
             <Chip label={`גיל ${age}`} value={ageOffset} />
-            <span style={{ fontSize:12, color:"#556" }}>= <strong style={{ color:"#fff" }}>{feelTemp}°C</strong> תחושה</span>
+            <span style={{ fontSize:12, color:"#556" }}>= <strong style={{ color:"#fff" }}>{feelTemp}°C</strong></span>
           </div>
         </div>
-
         <div style={{ background:"#080e15", border:"1px solid #1a2535", borderRadius:14, padding:"14px 16px", marginBottom:18 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
             <div style={{ fontSize:10, color:"#445", letterSpacing:"0.08em", textTransform:"uppercase" }}>📲 הודעת ערב</div>
-            <button onClick={onCopy} style={{ background:"none", border:`1px solid ${copied?"#2EC4B6":"#1a2535"}`, borderRadius:8, color:copied?"#2EC4B6":"#445", fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
+            <button onClick={onCopy} style={{ background:"none", border:`1px solid ${copied?"#2EC4B6":"#1a2535"}`, borderRadius:8, color:copied?"#2EC4B6":"#445", fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>
               {copied ? "✓ הועתק" : "העתק"}
             </button>
           </div>
           <p style={{ fontSize:13, color:"#778", lineHeight:1.75, fontStyle:"italic" }}>
-            "היי <strong style={{ color:"#fff" }}>{name}</strong>! מחר ב{weather.cityHe} יהיו <strong style={{ color:rec.color }}>{weather.avg}°C</strong>, אבל בשבילך זה ירגיש כמו <strong style={{ color:rec.color }}>{feelTemp}°C</strong>. ההמלצה שלנו: {rec.clothes}"
+            "היי <strong style={{ color:"#fff" }}>{name}</strong>! מחר ב{weather.cityHe} יהיו <strong style={{ color:rec.color }}>{weather.avg}°C</strong>, אבל בשבילך זה ירגיש כמו <strong style={{ color:rec.color }}>{feelTemp}°C</strong>. ההמלצה: {rec.clothes}"
           </p>
         </div>
-
-        <button onClick={onReset} style={{ width:"100%", padding:"13px", background:"transparent", border:"1px solid #1a2535", borderRadius:14, color:"#445", fontSize:14, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}
+        <button onClick={onReset} style={{ width:"100%", padding:"13px", background:"transparent", border:"1px solid #1a2535", borderRadius:14, color:"#445", fontSize:14, cursor:"pointer", fontFamily:"inherit" }}
           onMouseOver={e=>(e.currentTarget.style.borderColor="#2a3545")}
           onMouseOut={e=>(e.currentTarget.style.borderColor="#1a2535")}>
           ← קבל תחזית חדשה
@@ -246,80 +234,82 @@ function ResultCard({ result, name, onReset, onCopy, copied }: { result: Weather
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 type View = "auth_email" | "auth_otp" | "auth_register" | "weather";
-
-const EMPTY_PROFILE = { name:"", phone:"", gender:"", birthdate:"", height:"", weight:"", city:"" };
+const EMPTY = { name:"", phone:"", gender:"", birthdate:"", height:"", weight:"", city:"" };
 
 export default function App() {
-  const [view, setView]           = useState<View>("auth_email");
-  const [email, setEmail]         = useState("");
-  const [otp, setOtp]             = useState("");
-  const [profile, setProfile]     = useState<Profile | null>(null);
-  const [form, setForm]           = useState(EMPTY_PROFILE);
-  const [errors, setErrors]       = useState<Record<string,string>>({});
-  const [loading, setLoading]     = useState(false);
+  const [view, setView]     = useState<View>("auth_email");
+  const [email, setEmail]   = useState("");
+  const [otp, setOtp]       = useState("");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [form, setForm]     = useState(EMPTY);
+  const [city, setCity]     = useState("");
+  const [errors, setErrors] = useState<Record<string,string>>({});
+  const [loading, setLoading]   = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [globalError, setGlobalError] = useState("");
-  const [result, setResult]       = useState<WeatherResult | null>(null);
-  const [copied, setCopied]       = useState(false);
+  const [result, setResult] = useState<WeatherResult | null>(null);
+  const [copied, setCopied] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
 
   const setF = (k: string) => (v: string) => { setForm(f=>({...f,[k]:v})); setErrors(e=>({...e,[k]:""})); setGlobalError(""); };
 
-  // Check existing session on load
+  // Load saved session
   useEffect(() => {
-    getSupabase().auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return;
-      const { data: p } = await getSupabase().from("profiles").select("*").eq("id", session.user.id).single();
-      if (p) { setProfile(p as Profile); setEmail((p as Profile).email); setView("weather"); }
-    });
+    const saved = localStorage.getItem("tw_email");
+    if (saved) {
+      fetch("/api/auth/verify-otp", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email: saved, code: "__session__" }) })
+        .catch(() => {});
+      // Just restore email from localStorage and fetch user
+      fetch(`/api/users/get?email=${encodeURIComponent(saved)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data?.email) { setProfile(data); setEmail(saved); setView("weather"); }
+        })
+        .catch(() => {});
+    }
   }, []);
 
-  // ── AUTH: send OTP ──
+  // ── SEND OTP ──
   async function sendOtp() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErrors({ email: "מייל לא תקין" }); return; }
     setLoading(true); setGlobalError("");
     try {
-      const { error } = await getSupabase().auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
-      if (error) throw error;
+      const res = await fetch("/api/auth/send-otp", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email }) });
+      if (!res.ok) throw new Error("שגיאה בשליחת קוד");
       setView("auth_otp");
     } catch (e: unknown) {
       setGlobalError(e instanceof Error ? e.message : "שגיאה בשליחת קוד");
     } finally { setLoading(false); }
   }
 
-  // ── AUTH: verify OTP ──
+  // ── VERIFY OTP ──
   async function verifyOtp() {
     if (otp.length < 4) { setErrors({ otp: "יש להזין את הקוד שנשלח" }); return; }
     setLoading(true); setGlobalError("");
     try {
-      const { data, error } = await getSupabase().auth.verifyOtp({ email, token: otp, type: "email" });
-      if (error) throw error;
-      const userId = data.user?.id;
-      if (!userId) throw new Error("שגיאה בהתחברות");
-
-      const { data: p } = await getSupabase().from("profiles").select("*").eq("id", userId).single();
-      if (p) {
-        setProfile(p as Profile);
-        setView("weather");
+      const res = await fetch("/api/auth/verify-otp", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email, code: otp }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error("קוד שגוי, נסה שוב");
+      if (data.user) {
+        setProfile(data.user); localStorage.setItem("tw_email", email); setView("weather");
       } else {
-        setForm(f => ({ ...f }));
         setView("auth_register");
       }
     } catch (e: unknown) {
-      setGlobalError(e instanceof Error ? e.message : "קוד שגוי, נסה שוב");
+      setGlobalError(e instanceof Error ? e.message : "קוד שגוי");
     } finally { setLoading(false); }
   }
 
   // ── REGISTER ──
   function validateRegister() {
     const e: Record<string,string> = {};
-    if (!form.name.trim())   e.name = "שדה חובה";
-    if (!form.gender)        e.gender = "יש לבחור מגדר";
-    if (!form.birthdate)     e.birthdate = "שדה חובה";
+    if (!form.name.trim()) e.name = "שדה חובה";
+    if (!form.gender) e.gender = "יש לבחור מגדר";
+    if (!form.birthdate) e.birthdate = "שדה חובה";
     else { const a = calcAge(form.birthdate); if (a < 5 || a > 110) e.birthdate = "תאריך לא תקין"; }
     if (!form.height || +form.height < 50) e.height = "ערך לא תקין";
     if (!form.weight || +form.weight < 10) e.weight = "ערך לא תקין";
-    if (!form.city.trim())   e.city = "יש להזין עיר";
+    if (!city.trim()) e.city = "יש להזין עיר";
     return e;
   }
 
@@ -328,41 +318,26 @@ export default function App() {
     if (Object.keys(e).length) { setErrors(e); return; }
     setLoading(true); setGlobalError("");
     try {
-      const { data: { user } } = await getSupabase().auth.getUser();
-      if (!user) throw new Error("לא מחובר");
-      const profileData = {
-        id: user.id,
-        email,
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        gender: form.gender,
-        birthdate: form.birthdate,
-        height: +form.height,
-        weight: +form.weight,
-        city: form.city.trim(),
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await getSupabase().from("profiles").upsert(profileData as any);
-      if (error) throw error;
-      setProfile(profileData as Profile);
-      setView("weather");
+      const profileData: UserProfile = { email, name: form.name.trim(), phone: form.phone.trim(), gender: form.gender, birthdate: form.birthdate, height: form.height, weight: form.weight, city: city.trim() };
+      const res = await fetch("/api/users/save", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(profileData) });
+      if (!res.ok) throw new Error("שגיאה בשמירה");
+      setProfile(profileData); localStorage.setItem("tw_email", email); setView("weather");
     } catch (e: unknown) {
       setGlobalError(e instanceof Error ? e.message : "שגיאה בשמירה");
     } finally { setLoading(false); }
   }
 
   // ── WEATHER ──
-  async function fetchWeather(city: string) {
+  async function fetchWeather(fetchCity: string) {
     setLoading(true); setLoadingMsg("🔍 מחפש תחזית מזג אוויר..."); setGlobalError("");
     try {
-      const res = await fetch("/api/weather", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ city }) });
+      const res = await fetch("/api/weather", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ city: fetchCity }) });
       const weather = await res.json();
-      if (!res.ok) throw new Error(weather.error === "city_not_found" ? `לא מצאנו את העיר "${city}"` : "שגיאה בקבלת תחזית");
-
+      if (!res.ok) throw new Error(weather.error === "city_not_found" ? `לא מצאנו את העיר "${fetchCity}"` : "שגיאה בקבלת תחזית");
       setLoadingMsg("🧮 מחשב תחושה אישית...");
       const p = profile!;
       const age = calcAge(p.birthdate);
-      const bmi = calcBMI(p.weight, p.height);
+      const bmi = calcBMI(+p.weight, +p.height);
       const { genderOffset, bmiOffset, ageOffset } = getOffsets(p.gender, bmi, age);
       const feelTemp = weather.avg + genderOffset + bmiOffset + ageOffset;
       const rec = getRecommendation(feelTemp);
@@ -370,7 +345,7 @@ export default function App() {
       const dateStr = tom.toLocaleDateString("he-IL", { weekday:"long", day:"numeric", month:"long" });
       setResult({ age, bmi: bmi.toFixed(1), genderOffset, bmiOffset, ageOffset, feelTemp, rec, weather, dateStr });
     } catch (e: unknown) {
-      setGlobalError(e instanceof Error ? e.message : "שגיאה בקבלת תחזית");
+      setGlobalError(e instanceof Error ? e.message : "שגיאה");
     } finally { setLoading(false); setLoadingMsg(""); }
   }
 
@@ -378,216 +353,189 @@ export default function App() {
   async function useMyLocation(setter: (v: string) => void) {
     setLocLoading(true);
     try {
-      const city = await detectCity();
-      if (city) setter(city);
-      else setGlobalError("לא הצלחנו לזהות את העיר מהמיקום");
+      const c = await detectCity();
+      if (c) setter(c); else setGlobalError("לא הצלחנו לזהות עיר מהמיקום");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       if (msg === "location_denied") setGlobalError("יש לאשר גישה למיקום בדפדפן");
-      else if (msg === "geolocation_unsupported") setGlobalError("הדפדפן לא תומך בגיאולוקיישן");
-      else setGlobalError("לא הצלחנו לאתר את מיקומך");
+      else setGlobalError("לא הצלחנו לאתר מיקום");
     } finally { setLocLoading(false); }
   }
 
-  function signOut() {
-    getSupabase().auth.signOut();
-    setProfile(null); setEmail(""); setOtp(""); setResult(null);
-    setForm(EMPTY_PROFILE); setView("auth_email");
-  }
+  function signOut() { localStorage.removeItem("tw_email"); setProfile(null); setEmail(""); setOtp(""); setResult(null); setForm(EMPTY); setCity(""); setView("auth_email"); }
 
   const bgColors = result ? result.rec.sky : (["#1a2a4a","#0d1b2e","#2a3a5a"] as [string,string,string]);
-  const bgSun    = result ? result.rec.sun : false;
-
-  const globalStyles = `
-    @keyframes slideUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-    @keyframes drift{from{transform:translateX(-140px)}to{transform:translateX(calc(100vw + 140px))}}
-    @keyframes twinkle{from{opacity:0.2}to{opacity:1}}
-    @keyframes sunPulse{0%,100%{box-shadow:0 0 40px 20px rgba(255,200,50,0.35)}50%{box-shadow:0 0 65px 30px rgba(255,200,50,0.55)}}
-    *{box-sizing:border-box;margin:0;padding:0;}
-    input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
-    input::placeholder{color:rgba(255,255,255,0.18);}
-    input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.4) sepia(1) hue-rotate(180deg);}
-    ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
-  `;
 
   return (
     <div dir="rtl" style={{ minHeight:"100vh", fontFamily:"'Heebo', sans-serif", position:"relative", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px 48px" }}>
-      <style>{globalStyles}</style>
+      <style>{`
+        @keyframes slideUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+        @keyframes drift{from{transform:translateX(-140px)}to{transform:translateX(calc(100vw + 140px))}}
+        @keyframes twinkle{from{opacity:0.2}to{opacity:1}}
+        @keyframes sunPulse{0%,100%{box-shadow:0 0 40px 20px rgba(255,200,50,0.35)}50%{box-shadow:0 0 65px 30px rgba(255,200,50,0.55)}}
+        *{box-sizing:border-box;margin:0;padding:0;}
+        input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;}
+        input::placeholder{color:rgba(255,255,255,0.18);}
+        input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.4) sepia(1) hue-rotate(180deg);}
+        ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
+      `}</style>
 
-      {/* Sky BG */}
       <div style={{ position:"fixed", inset:0, zIndex:0 }}>
-        <SkyBackground colors={bgColors} sun={bgSun} />
+        <SkyBackground colors={bgColors} sun={result?.rec.sun ?? false} />
         <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }} />
       </div>
 
       <div style={{ position:"relative", zIndex:1, width:"100%", maxWidth:460 }}>
-
         {/* Header */}
         <div style={{ textAlign:"center", marginBottom:22, animation:"fadeIn .5s ease both" }}>
           <div style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"7px 20px", background:"rgba(255,255,255,0.08)", backdropFilter:"blur(12px)", borderRadius:40, border:"1px solid rgba(255,255,255,0.12)", marginBottom:12 }}>
-            <span style={{ fontSize:16 }}>🌡️</span>
+            <span>🌡️</span>
             <span style={{ fontSize:12, fontWeight:800, letterSpacing:"0.14em", color:"rgba(255,255,255,0.8)", textTransform:"uppercase" }}>ThermoWear</span>
           </div>
           <h1 style={{ fontSize:28, fontWeight:900, color:"#fff", lineHeight:1.2, textShadow:"0 2px 20px rgba(0,0,0,0.5)" }}>
-            {view === "auth_email" && "מה ללבוש מחר?"}
-            {view === "auth_otp" && "הזן קוד אימות"}
-            {view === "auth_register" && "ספר לנו קצת עליך"}
-            {view === "weather" && (result ? `היי ${profile?.name} 👋` : `שלום ${profile?.name} 👋`)}
+            {view === "weather" && profile ? `שלום ${profile.name} 👋` : view === "auth_otp" ? "הזן קוד אימות" : view === "auth_register" ? "ספר לנו קצת עליך" : "מה ללבוש מחר?"}
           </h1>
           {view === "auth_email" && <p style={{ marginTop:6, fontSize:13, color:"rgba(255,255,255,0.4)" }}>המלצת לבוש אישית לפי מזג האוויר</p>}
           {profile && view === "weather" && (
-            <button onClick={signOut} style={{ marginTop:8, background:"none", border:"none", color:"rgba(255,255,255,0.25)", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
-              ← התנתק
-            </button>
+            <button onClick={signOut} style={{ marginTop:8, background:"none", border:"none", color:"rgba(255,255,255,0.25)", fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>← התנתק</button>
           )}
         </div>
 
-        {/* ── EMAIL VIEW ── */}
+        {/* ── EMAIL ── */}
         {view === "auth_email" && (
-          <div style={{ background:"rgba(10,18,30,0.78)", backdropFilter:"blur(22px)", borderRadius:24, border:"1px solid rgba(255,255,255,0.08)", boxShadow:"0 32px 80px rgba(0,0,0,0.55)", overflow:"hidden", animation:"slideUp .5s cubic-bezier(.23,1,.32,1) both" }}>
-            <div style={{ height:3, background:"linear-gradient(90deg,#74B9FF,#F4A261,#FF6B35)" }} />
-            <div style={{ padding:"28px 24px 30px", display:"flex", flexDirection:"column", gap:18 }}>
+          <Card>
+            <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
               <FieldWrap label="כתובת מייל" error={errors.email} required>
                 <TextInput value={email} onChange={v=>{ setEmail(v); setErrors({}); setGlobalError(""); }} type="email" placeholder="you@example.com" ltr error={errors.email} />
               </FieldWrap>
-              {globalError && <div style={{ background:"rgba(255,107,107,0.1)", border:"1px solid rgba(255,107,107,0.3)", borderRadius:12, padding:"12px 16px", fontSize:13, color:"#FF8080" }}>⚠ {globalError}</div>}
+              {globalError && <ErrorBox>{globalError}</ErrorBox>}
               <PrimaryBtn onClick={sendOtp} loading={loading}>שלח קוד אימות 📨</PrimaryBtn>
               <p style={{ textAlign:"center", fontSize:12, color:"rgba(255,255,255,0.2)", lineHeight:1.6 }}>
-                נשלח קוד חד-פעמי למייל שלך.<br />אם זו הפעם הראשונה – תמלא פרטים קצרים.
+                נשלח קוד 6 ספרות למייל שלך.<br/>פעם ראשונה? תמלא פרטים קצרים אחרי האימות.
               </p>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* ── OTP VIEW ── */}
+        {/* ── OTP ── */}
         {view === "auth_otp" && (
-          <div style={{ background:"rgba(10,18,30,0.78)", backdropFilter:"blur(22px)", borderRadius:24, border:"1px solid rgba(255,255,255,0.08)", boxShadow:"0 32px 80px rgba(0,0,0,0.55)", overflow:"hidden", animation:"slideUp .5s cubic-bezier(.23,1,.32,1) both" }}>
-            <div style={{ height:3, background:"linear-gradient(90deg,#74B9FF,#F4A261,#FF6B35)" }} />
-            <div style={{ padding:"28px 24px 30px", display:"flex", flexDirection:"column", gap:18 }}>
+          <Card>
+            <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
               <p style={{ fontSize:14, color:"rgba(255,255,255,0.5)", textAlign:"center" }}>
-                שלחנו קוד 6 ספרות לכתובת<br /><strong style={{ color:"#F4A261" }}>{email}</strong>
+                שלחנו קוד ל-<strong style={{ color:"#F4A261" }}>{email}</strong>
               </p>
-              <FieldWrap label="קוד אימות" error={errors.otp} required>
+              <FieldWrap label="קוד אימות (6 ספרות)" error={errors.otp} required>
                 <TextInput value={otp} onChange={v=>{ setOtp(v); setErrors({}); setGlobalError(""); }} type="text" placeholder="123456" ltr error={errors.otp} />
               </FieldWrap>
-              {globalError && <div style={{ background:"rgba(255,107,107,0.1)", border:"1px solid rgba(255,107,107,0.3)", borderRadius:12, padding:"12px 16px", fontSize:13, color:"#FF8080" }}>⚠ {globalError}</div>}
+              {globalError && <ErrorBox>{globalError}</ErrorBox>}
               <PrimaryBtn onClick={verifyOtp} loading={loading}>אמת והיכנס ✓</PrimaryBtn>
               <button onClick={()=>{ setView("auth_email"); setOtp(""); setGlobalError(""); }} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.25)", fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
                 ← שנה מייל
               </button>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* ── REGISTER VIEW ── */}
+        {/* ── REGISTER ── */}
         {view === "auth_register" && (
-          <div style={{ background:"rgba(10,18,30,0.78)", backdropFilter:"blur(22px)", borderRadius:24, border:"1px solid rgba(255,255,255,0.08)", boxShadow:"0 32px 80px rgba(0,0,0,0.55)", overflow:"hidden", animation:"slideUp .5s cubic-bezier(.23,1,.32,1) both" }}>
-            <div style={{ height:3, background:"linear-gradient(90deg,#74B9FF,#F4A261,#FF6B35)" }} />
-            <div style={{ padding:"26px 24px 30px" }}>
-              <p style={{ fontSize:13, color:"rgba(255,255,255,0.3)", marginBottom:20, textAlign:"center" }}>פרטים אלה יישמרו לשימוש הבא</p>
-
-              <SectionLabel icon="👤" text="פרטים אישיים" />
-              <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:22 }}>
-                <FieldWrap label="שם מלא" error={errors.name} required>
-                  <TextInput value={form.name} onChange={setF("name")} placeholder="ישראל ישראלי" error={errors.name} />
-                </FieldWrap>
-                <FieldWrap label="טלפון" error={errors.phone}>
-                  <TextInput value={form.phone} onChange={setF("phone")} type="tel" placeholder="050-0000000" ltr />
-                </FieldWrap>
-              </div>
-
-              <div style={{ height:1, background:"rgba(255,255,255,0.06)", marginBottom:20 }} />
-              <SectionLabel icon="📊" text="נתוני גוף" />
-              <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:22 }}>
-                <FieldWrap label="מגדר" error={errors.gender} required>
-                  <div style={{ display:"flex", gap:10 }}>
-                    {([["male","♂ זכר"],["female","♀ נקבה"]] as [string,string][]).map(([val,lbl])=>(
-                      <button key={val} onClick={()=>setF("gender")(val)} style={{
-                        flex:1, padding:"13px 0", borderRadius:12, cursor:"pointer",
-                        fontSize:15, fontWeight:700, fontFamily:"inherit", border:"1.5px solid",
-                        transition:"all .2s",
-                        borderColor: form.gender===val ? "#F4A261" : errors.gender ? "#FF6B6B" : "rgba(255,255,255,0.08)",
-                        background: form.gender===val ? "rgba(244,162,97,0.15)" : "rgba(255,255,255,0.03)",
-                        color: form.gender===val ? "#F4A261" : "rgba(255,255,255,0.3)",
-                      }}>{lbl}</button>
-                    ))}
-                  </div>
-                </FieldWrap>
-                <FieldWrap label="תאריך לידה" error={errors.birthdate} required>
-                  <TextInput value={form.birthdate} onChange={setF("birthdate")} type="date" error={errors.birthdate} />
-                </FieldWrap>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                  <FieldWrap label="גובה" error={errors.height} required>
-                    <TextInput value={form.height} onChange={setF("height")} type="number" placeholder="170" unit='ס"מ' error={errors.height} />
-                  </FieldWrap>
-                  <FieldWrap label="משקל" error={errors.weight} required>
-                    <TextInput value={form.weight} onChange={setF("weight")} type="number" placeholder="70" unit='ק"ג' error={errors.weight} />
-                  </FieldWrap>
-                </div>
-              </div>
-
-              <div style={{ height:1, background:"rgba(255,255,255,0.06)", marginBottom:20 }} />
-              <SectionLabel icon="📍" text="מיקום" />
-              <div style={{ marginBottom:22 }}>
-                <FieldWrap label="עיר" error={errors.city} required>
-                  <TextInput value={form.city} onChange={setF("city")} placeholder="תל אביב / חדרה / ירושלים..." error={errors.city} />
-                </FieldWrap>
-                <button onClick={()=>useMyLocation(setF("city"))} disabled={locLoading} style={{
-                  marginTop:8, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)",
-                  borderRadius:10, color:"rgba(255,255,255,0.4)", fontSize:12, padding:"8px 14px",
-                  cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:6,
-                  opacity: locLoading ? 0.5 : 1,
-                }}>
-                  {locLoading ? "⏳ מאתר מיקום..." : "📍 זהה מיקום אוטומטית"}
-                </button>
-              </div>
-
-              {globalError && <div style={{ background:"rgba(255,107,107,0.1)", border:"1px solid rgba(255,107,107,0.3)", borderRadius:12, padding:"12px 16px", marginBottom:16, fontSize:13, color:"#FF8080" }}>⚠ {globalError}</div>}
-              <PrimaryBtn onClick={saveProfile} loading={loading}>שמור והמשך 🌡️</PrimaryBtn>
+          <Card>
+            <p style={{ fontSize:13, color:"rgba(255,255,255,0.3)", marginBottom:20, textAlign:"center" }}>פרטים אלה יישמרו לשימוש הבא</p>
+            <SectionLabel icon="👤" text="פרטים אישיים" />
+            <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:22 }}>
+              <FieldWrap label="שם מלא" error={errors.name} required>
+                <TextInput value={form.name} onChange={setF("name")} placeholder="ישראל ישראלי" error={errors.name} />
+              </FieldWrap>
+              <FieldWrap label="טלפון">
+                <TextInput value={form.phone} onChange={setF("phone")} type="tel" placeholder="050-0000000" ltr />
+              </FieldWrap>
             </div>
-          </div>
+            <div style={{ height:1, background:"rgba(255,255,255,0.06)", marginBottom:20 }} />
+            <SectionLabel icon="📊" text="נתוני גוף" />
+            <div style={{ display:"flex", flexDirection:"column", gap:14, marginBottom:22 }}>
+              <FieldWrap label="מגדר" error={errors.gender} required>
+                <div style={{ display:"flex", gap:10 }}>
+                  {([["male","♂ זכר"],["female","♀ נקבה"]] as [string,string][]).map(([val,lbl])=>(
+                    <button key={val} onClick={()=>setF("gender")(val)} style={{ flex:1, padding:"13px 0", borderRadius:12, cursor:"pointer", fontSize:15, fontWeight:700, fontFamily:"inherit", border:"1.5px solid", transition:"all .2s", borderColor: form.gender===val?"#F4A261":errors.gender?"#FF6B6B":"rgba(255,255,255,0.08)", background: form.gender===val?"rgba(244,162,97,0.15)":"rgba(255,255,255,0.03)", color: form.gender===val?"#F4A261":"rgba(255,255,255,0.3)" }}>{lbl}</button>
+                  ))}
+                </div>
+              </FieldWrap>
+              <FieldWrap label="תאריך לידה" error={errors.birthdate} required>
+                <TextInput value={form.birthdate} onChange={setF("birthdate")} type="date" error={errors.birthdate} />
+              </FieldWrap>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <FieldWrap label="גובה" error={errors.height} required>
+                  <TextInput value={form.height} onChange={setF("height")} type="number" placeholder="170" unit='ס"מ' error={errors.height} />
+                </FieldWrap>
+                <FieldWrap label="משקל" error={errors.weight} required>
+                  <TextInput value={form.weight} onChange={setF("weight")} type="number" placeholder="70" unit='ק"ג' error={errors.weight} />
+                </FieldWrap>
+              </div>
+            </div>
+            <div style={{ height:1, background:"rgba(255,255,255,0.06)", marginBottom:20 }} />
+            <SectionLabel icon="📍" text="מיקום" />
+            <div style={{ marginBottom:22 }}>
+              <FieldWrap label="עיר" error={errors.city} required>
+                <TextInput value={city} onChange={v=>{ setCity(v); setErrors(e=>({...e,city:""})); }} placeholder="תל אביב / ירושלים..." error={errors.city} />
+              </FieldWrap>
+              <button onClick={()=>useMyLocation(setCity)} disabled={locLoading} style={{ marginTop:8, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"rgba(255,255,255,0.4)", fontSize:12, padding:"8px 14px", cursor:"pointer", fontFamily:"inherit", opacity: locLoading?0.5:1 }}>
+                {locLoading ? "⏳ מאתר..." : "📍 זהה מיקום אוטומטית"}
+              </button>
+            </div>
+            {globalError && <ErrorBox style={{ marginBottom:16 }}>{globalError}</ErrorBox>}
+            <PrimaryBtn onClick={saveProfile} loading={loading}>שמור והמשך 🌡️</PrimaryBtn>
+          </Card>
         )}
 
-        {/* ── WEATHER VIEW ── */}
+        {/* ── WEATHER ── */}
         {view === "weather" && profile && (
           result ? (
             <ResultCard result={result} name={profile.name} onReset={()=>setResult(null)} onCopy={()=>{
               const { weather, feelTemp, rec, dateStr } = result;
-              navigator.clipboard.writeText(`היי ${profile.name}! מחר ${dateStr} ב${weather.cityHe} יהיו ${weather.avg}°C, אבל בשבילך זה ירגיש כמו ${feelTemp}°C. ההמלצה שלנו: ${rec.clothes}`);
+              navigator.clipboard.writeText(`היי ${profile.name}! מחר ${dateStr} ב${weather.cityHe} יהיו ${weather.avg}°C, אבל בשבילך זה ירגיש כמו ${feelTemp}°C. ההמלצה: ${rec.clothes}`);
               setCopied(true); setTimeout(()=>setCopied(false), 2500);
             }} copied={copied} />
           ) : (
-            <div style={{ background:"rgba(10,18,30,0.78)", backdropFilter:"blur(22px)", borderRadius:24, border:"1px solid rgba(255,255,255,0.08)", boxShadow:"0 32px 80px rgba(0,0,0,0.55)", overflow:"hidden", animation:"slideUp .5s cubic-bezier(.23,1,.32,1) both" }}>
-              <div style={{ height:3, background:"linear-gradient(90deg,#74B9FF,#F4A261,#FF6B35)" }} />
-              <div style={{ padding:"26px 24px 30px", display:"flex", flexDirection:"column", gap:18 }}>
-                <SectionLabel icon="📍" text="עיר לתחזית מחר" />
+            <Card>
+              <SectionLabel icon="📍" text="עיר לתחזית מחר" />
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
                 <FieldWrap label="עיר" error={errors.city}>
-                  <TextInput value={form.city || profile.city} onChange={setF("city")} placeholder={profile.city} error={errors.city} />
+                  <TextInput value={city || profile.city} onChange={v=>{ setCity(v); setErrors(e=>({...e,city:""})); }} placeholder={profile.city} error={errors.city} />
                 </FieldWrap>
-                <button onClick={()=>useMyLocation(setF("city"))} disabled={locLoading} style={{
-                  background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)",
-                  borderRadius:10, color:"rgba(255,255,255,0.4)", fontSize:12, padding:"8px 14px",
-                  cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:6,
-                  opacity: locLoading ? 0.5 : 1,
-                }}>
-                  {locLoading ? "⏳ מאתר מיקום..." : "📍 זהה מיקום אוטומטית"}
+                <button onClick={()=>useMyLocation(setCity)} disabled={locLoading} style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"rgba(255,255,255,0.4)", fontSize:12, padding:"8px 14px", cursor:"pointer", fontFamily:"inherit", opacity: locLoading?0.5:1, display:"flex", alignItems:"center", gap:6 }}>
+                  {locLoading ? "⏳ מאתר..." : "📍 זהה מיקום אוטומטית"}
                 </button>
-                {globalError && <div style={{ background:"rgba(255,107,107,0.1)", border:"1px solid rgba(255,107,107,0.3)", borderRadius:12, padding:"12px 16px", fontSize:13, color:"#FF8080" }}>⚠ {globalError}</div>}
-                <PrimaryBtn onClick={()=>fetchWeather(form.city || profile.city)} loading={loading}>
+                {globalError && <ErrorBox>{globalError}</ErrorBox>}
+                <PrimaryBtn onClick={()=>fetchWeather(city || profile.city)} loading={loading}>
                   {loading ? loadingMsg || "טוען..." : "קבל את ההמלצה שלי 🌡️"}
                 </PrimaryBtn>
               </div>
-            </div>
+            </Card>
           )
         )}
 
-        <p style={{ textAlign:"center", fontSize:10, color:"rgba(255,255,255,0.1)", marginTop:16, letterSpacing:"0.06em" }}>
-          מבוסס על פיזיולוגיה תרמית · תנאי חוץ בלבד
-        </p>
+        <p style={{ textAlign:"center", fontSize:10, color:"rgba(255,255,255,0.1)", marginTop:16, letterSpacing:"0.06em" }}>מבוסס על פיזיולוגיה תרמית · תנאי חוץ בלבד</p>
       </div>
+    </div>
+  );
+}
+
+// ─── SMALL HELPERS ────────────────────────────────────────────────────────────
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ background:"rgba(10,18,30,0.78)", backdropFilter:"blur(22px)", borderRadius:24, border:"1px solid rgba(255,255,255,0.08)", boxShadow:"0 32px 80px rgba(0,0,0,0.55)", overflow:"hidden", animation:"slideUp .5s cubic-bezier(.23,1,.32,1) both" }}>
+      <div style={{ height:3, background:"linear-gradient(90deg,#74B9FF,#F4A261,#FF6B35)" }} />
+      <div style={{ padding:"26px 24px 30px" }}>{children}</div>
+    </div>
+  );
+}
+
+function ErrorBox({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{ background:"rgba(255,107,107,0.1)", border:"1px solid rgba(255,107,107,0.3)", borderRadius:12, padding:"12px 16px", fontSize:13, color:"#FF8080", ...style }}>
+      ⚠ {children}
     </div>
   );
 }
