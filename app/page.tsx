@@ -292,7 +292,9 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error("קוד שגוי, נסה שוב");
       if (data.user) {
-        setProfile(data.user); localStorage.setItem("tw_email", email); setView("weather");
+        setProfile(data.user); localStorage.setItem("tw_email", email);
+        setView("weather");
+        setTimeout(() => fetchWeatherForProfile(data.user), 100);
       } else {
         setView("auth_register");
       }
@@ -322,21 +324,22 @@ export default function App() {
       const profileData: UserProfile = { email, name: form.name.trim(), phone: form.phone.trim(), gender: form.gender, birthdate: form.birthdate, height: form.height, weight: form.weight, city: city.trim() };
       const res = await fetch("/api/users/save", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(profileData) });
       if (!res.ok) throw new Error("שגיאה בשמירה");
-      setProfile(profileData); localStorage.setItem("tw_email", email); setView("weather");
+      setProfile(profileData); localStorage.setItem("tw_email", email);
+      setView("weather");
+      setTimeout(() => fetchWeatherForProfile(profileData), 100);
     } catch (e: unknown) {
       setGlobalError(e instanceof Error ? e.message : "שגיאה בשמירה");
     } finally { setLoading(false); }
   }
 
   // ── WEATHER ──
-  async function fetchWeather(fetchCity: string) {
+  async function doFetchWeather(fetchCity: string, p: UserProfile) {
     setLoading(true); setLoadingMsg("🔍 מחפש תחזית מזג אוויר..."); setGlobalError("");
     try {
       const res = await fetch("/api/weather", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ city: fetchCity }) });
       const weather = await res.json();
-      if (!res.ok) throw new Error(weather.error === "city_not_found" ? `לא מצאנו את העיר "${fetchCity}"` : "שגיאה בקבלת תחזית");
+      if (!res.ok) throw new Error(weather.detail || (weather.error === "city_not_found" ? `לא מצאנו את העיר "${fetchCity}"` : "שגיאה בקבלת תחזית"));
       setLoadingMsg("🧮 מחשב תחושה אישית...");
-      const p = profile!;
       const age = calcAge(p.birthdate);
       const bmi = calcBMI(+p.weight, +p.height);
       const { genderOffset, bmiOffset, ageOffset } = getOffsets(p.gender, bmi, age);
@@ -349,6 +352,9 @@ export default function App() {
       setGlobalError(e instanceof Error ? e.message : "שגיאה");
     } finally { setLoading(false); setLoadingMsg(""); }
   }
+
+  async function fetchWeather(fetchCity: string) { await doFetchWeather(fetchCity, profile!); }
+  async function fetchWeatherForProfile(p: UserProfile) { await doFetchWeather(p.city, p); }
 
   // ── GEOLOCATION ──
   async function useMyLocation(setter: (v: string) => void) {

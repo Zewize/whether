@@ -28,10 +28,14 @@ If the city does not exist reply: {"error": "not_found"}`;
         "anthropic-version": "2023-06-01",
         "x-api-key": apiKey,
       },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1024, tools: TOOLS, messages }),
+      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1024, tools: TOOLS, messages }),
     });
 
-    if (!res.ok) return NextResponse.json({ error: "anthropic error" }, { status: 500 });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Anthropic error:", errText);
+      return NextResponse.json({ error: "anthropic error", detail: errText.slice(0, 200) }, { status: 500 });
+    }
     const data = await res.json();
 
     if (data.stop_reason === "end_turn") { finalData = data; break; }
