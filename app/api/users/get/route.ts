@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserByEmail } from "@/lib/sheets";
+import { getUserByEmail } from "@/lib/excel-db";
 
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email");

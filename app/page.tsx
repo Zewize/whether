@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import type { UserProfile } from "@/lib/sheets";
+import type { UserProfile } from "@/lib/excel-db";
 
 // ─── LOGIC ────────────────────────────────────────────────────────────────────
 function calcAge(birthdate: string) {
