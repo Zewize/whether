@@ -39,7 +39,7 @@ function createEmpty(): XLSX.WorkBook {
 
 async function saveWorkbook(wb: XLSX.WorkBook) {
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  await put(BLOB_NAME, buf, { access: "public", allowOverwrite: true });
+  await put(BLOB_NAME, buf, { access: "private", allowOverwrite: true });
 }
 
 export async function getUserByEmail(email: string): Promise<UserProfile | null> {
