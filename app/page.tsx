@@ -174,8 +174,8 @@ type WeatherResult = {
   age: number;
 };
 
-function ResultCard({ result, name, onReset, onCopy, copied }: { result: WeatherResult; name: string; onReset: () => void; onCopy: () => void; copied: boolean }) {
-  const { rec, feelTemp, weather, dateStr, bmi, genderOffset, bmiOffset, ageOffset, age } = result;
+function ResultCard({ result, onChangCity }: { result: WeatherResult; onChangCity: () => void }) {
+  const { rec, feelTemp, weather, dateStr } = result;
   return (
     <div style={{ animation:"slideUp .6s cubic-bezier(.23,1,.32,1) both" }}>
       <div style={{ position:"relative", borderRadius:"24px 24px 0 0", overflow:"hidden", minHeight:230, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"flex-end", padding:"0 24px 28px" }}>
@@ -198,34 +198,14 @@ function ResultCard({ result, name, onReset, onCopy, copied }: { result: Weather
       </div>
 
       <div style={{ background:"#0f1923", padding:"20px 22px 26px", borderRadius:"0 0 24px 24px" }}>
-        <div style={{ background:"rgba(255,255,255,0.04)", border:`1px solid ${rec.color}44`, borderRadius:16, padding:"14px 16px", marginBottom:14 }}>
+        <div style={{ background:"rgba(255,255,255,0.04)", border:`1px solid ${rec.color}44`, borderRadius:16, padding:"14px 16px", marginBottom:18 }}>
           <div style={{ fontSize:10, color:rec.color, letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:700, marginBottom:6 }}>👕 המלצת לבוש למחר</div>
           <div style={{ fontSize:15, color:"#f0f0f0", lineHeight:1.65 }}>{rec.clothes}</div>
         </div>
-        <div style={{ background:"rgba(255,255,255,0.03)", borderRadius:14, padding:"12px 14px", marginBottom:14 }}>
-          <div style={{ fontSize:10, color:"#445", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:8 }}>ניתוח פיזיולוגי</div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:6, alignItems:"center" }}>
-            <Chip label="מגדר" value={genderOffset} />
-            <Chip label={`BMI ${parseFloat(bmi).toFixed(1)}`} value={bmiOffset} />
-            <Chip label={`גיל ${age}`} value={ageOffset} />
-            <span style={{ fontSize:12, color:"#556" }}>= <strong style={{ color:"#fff" }}>{feelTemp}°C</strong></span>
-          </div>
-        </div>
-        <div style={{ background:"#080e15", border:"1px solid #1a2535", borderRadius:14, padding:"14px 16px", marginBottom:18 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <div style={{ fontSize:10, color:"#445", letterSpacing:"0.08em", textTransform:"uppercase" }}>📲 הודעת ערב</div>
-            <button onClick={onCopy} style={{ background:"none", border:`1px solid ${copied?"#2EC4B6":"#1a2535"}`, borderRadius:8, color:copied?"#2EC4B6":"#445", fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>
-              {copied ? "✓ הועתק" : "העתק"}
-            </button>
-          </div>
-          <p style={{ fontSize:13, color:"#778", lineHeight:1.75, fontStyle:"italic" }}>
-            "היי <strong style={{ color:"#fff" }}>{name}</strong>! מחר ב{weather.cityHe} יהיו <strong style={{ color:rec.color }}>{weather.avg}°C</strong>, אבל בשבילך זה ירגיש כמו <strong style={{ color:rec.color }}>{feelTemp}°C</strong>. ההמלצה: {rec.clothes}"
-          </p>
-        </div>
-        <button onClick={onReset} style={{ width:"100%", padding:"13px", background:"transparent", border:"1px solid #1a2535", borderRadius:14, color:"#445", fontSize:14, cursor:"pointer", fontFamily:"inherit" }}
+        <button onClick={onChangCity} style={{ width:"100%", padding:"13px", background:"transparent", border:"1px solid #1a2535", borderRadius:14, color:"#778", fontSize:14, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}
           onMouseOver={e=>(e.currentTarget.style.borderColor="#2a3545")}
           onMouseOut={e=>(e.currentTarget.style.borderColor="#1a2535")}>
-          ← קבל תחזית חדשה
+          📍 שנה עיר לתחזית
         </button>
       </div>
     </div>
@@ -499,11 +479,7 @@ export default function App() {
         {/* ── WEATHER ── */}
         {view === "weather" && profile && (
           result ? (
-            <ResultCard result={result} name={profile.name} onReset={()=>setResult(null)} onCopy={()=>{
-              const { weather, feelTemp, rec, dateStr } = result;
-              navigator.clipboard.writeText(`היי ${profile.name}! מחר ${dateStr} ב${weather.cityHe} יהיו ${weather.avg}°C, אבל בשבילך זה ירגיש כמו ${feelTemp}°C. ההמלצה: ${rec.clothes}`);
-              setCopied(true); setTimeout(()=>setCopied(false), 2500);
-            }} copied={copied} />
+            <ResultCard result={result} onChangCity={()=>setResult(null)} />
           ) : (
             <Card>
               <SectionLabel icon="📍" text="עיר לתחזית מחר" />
