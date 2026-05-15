@@ -18,9 +18,13 @@ async function loadWorkbook(): Promise<XLSX.WorkBook> {
   try {
     const { blobs } = await list({ prefix: BLOB_NAME });
     if (blobs.length > 0) {
-      const res = await fetch(blobs[0].url);
-      const buffer = await res.arrayBuffer();
-      return XLSX.read(buffer, { type: "buffer" });
+      const res = await fetch(blobs[0].url, {
+        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+      });
+      if (res.ok) {
+        const buffer = await res.arrayBuffer();
+        return XLSX.read(buffer, { type: "buffer" });
+      }
     }
   } catch {}
   return createEmpty();

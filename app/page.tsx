@@ -275,7 +275,8 @@ export default function App() {
     setLoading(true); setGlobalError("");
     try {
       const res = await fetch("/api/auth/send-otp", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ email }) });
-      if (!res.ok) throw new Error("שגיאה בשליחת קוד");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.error || "שגיאה בשליחת קוד");
       setView("auth_otp");
     } catch (e: unknown) {
       setGlobalError(e instanceof Error ? e.message : "שגיאה בשליחת קוד");
