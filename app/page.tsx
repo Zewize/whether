@@ -713,7 +713,7 @@ function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfil
   const t=TR[lang];
   const isAdmin=profile.email==="ofek@zewize.com";
   const [editing,setEditing]=useState(false);
-  const [form,setForm]=useState({ name:profile.name, phone:profile.phone, city:profile.city, height:profile.height, weight:profile.weight });
+  const [form,setForm]=useState({ name:profile.name, phone:profile.phone, city:profile.city, height:profile.height, weight:profile.weight, gender:profile.gender, birthdate:profile.birthdate });
   const [saving,setSaving]=useState(false);
   const [saved,setSaved]=useState(false);
   const [locLoading,setLocLoading]=useState(false);
@@ -721,7 +721,7 @@ function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfil
   async function save() {
     setSaving(true);
     try {
-      const u:UserProfile={...profile,...form};
+      const u:UserProfile={...profile,...form,gender:form.gender||profile.gender,birthdate:form.birthdate||profile.birthdate};
       await fetch("/api/users/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(u)});
       onSaved(u); setSaved(true); setEditing(false); setTimeout(()=>setSaved(false),3000);
     } catch {} setSaving(false);
@@ -759,6 +759,15 @@ function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfil
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
             <FieldGroup label={t.fullName}><Input value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder={t.namePlaceholder}/></FieldGroup>
             <FieldGroup label={t.phone}><Input value={form.phone} onChange={v=>setForm(f=>({...f,phone:v}))} placeholder={t.phonePlaceholder} ltr/></FieldGroup>
+            <FieldGroup label={t.gender}>
+              <div style={{ display:"flex", gap:8 }}>
+                {([["male",t.male],["female",t.female]] as [string,string][]).map(([val,lbl])=>(
+                  <button key={val} onClick={()=>setForm(f=>({...f,gender:val}))} style={{ flex:1, padding:"10px", borderRadius:10, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit", border:"1.5px solid", transition:"all .2s",
+                    borderColor:form.gender===val?"#1e3a6e":C.border, background:form.gender===val?"#eff6ff":C.inputBg, color:form.gender===val?"#1e3a6e":C.textSec }}>{lbl}</button>
+                ))}
+              </div>
+            </FieldGroup>
+            <FieldGroup label={t.birthdate}><Input value={form.birthdate} onChange={v=>setForm(f=>({...f,birthdate:v}))} type="date"/></FieldGroup>
             <FieldGroup label={t.city}>
               <Input value={form.city} onChange={v=>setForm(f=>({...f,city:v}))} placeholder={t.cityPlaceholder}/>
               <button onClick={detectLoc} disabled={locLoading} style={{ marginTop:6, background:"none", border:`1px solid ${C.border}`, borderRadius:8, color:C.textSec, fontSize:11, padding:"7px 12px", cursor:"pointer", fontFamily:"inherit", textTransform:"uppercase" as const, letterSpacing:"0.06em" }}>
