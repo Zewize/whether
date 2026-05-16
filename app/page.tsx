@@ -291,6 +291,7 @@ function ResultCard({result,onChangCity,lang,email,onRateSubmit}:{result:Weather
   const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("today");
   const [ratings,setRatings]=useState<{today?:number;tomorrow?:number}>({});
   const [rateSaved,setRateSaved]=useState<{today?:boolean;tomorrow?:boolean}>({});
+  const [ratingDir,setRatingDir]=useState<{today?:string;tomorrow?:string}>({});
 
   const dayData = activeDay==="today"?result.today:result.tomorrow;
   const feelTemp = activeDay==="today"?result.todayFeel:result.tomorrowFeel;
@@ -300,11 +301,19 @@ function ResultCard({result,onChangCity,lang,email,onRateSubmit}:{result:Weather
 
   async function submitRating(v:number) {
     setRatings(r=>({...r,[activeDay]:v}));
+    setRateSaved(s=>({...s,[activeDay]:true}));
     try {
       await fetch("/api/ratings/save",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email,city:result.cityHe,day:activeDay,rating:v,feel_temp:feelTemp})});
-      setRateSaved(s=>({...s,[activeDay]:true}));
+        body:JSON.stringify({email,city:result.cityHe,day:activeDay,rating:v,feel_temp:feelTemp,direction:""})});
       onRateSubmit(activeDay,v);
+    } catch {}
+  }
+
+  async function submitDirection(dir:"too_hot"|"too_cold") {
+    setRatingDir(d=>({...d,[activeDay]:dir}));
+    try {
+      await fetch("/api/ratings/save",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email,city:result.cityHe,day:activeDay,rating:ratings[activeDay],feel_temp:feelTemp,direction:dir})});
     } catch {}
   }
 
@@ -357,8 +366,28 @@ function ResultCard({result,onChangCity,lang,email,onRateSubmit}:{result:Weather
 
         {/* Star rating */}
         <div style={{background:"rgba(255,255,255,0.03)",borderRadius:16,padding:"14px 16px",marginBottom:16}}>
-          <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",marginBottom:8}}>{rateSaved[activeDay]?t.rateSaved:t.rateTitle}</div>
-          <StarRating value={ratings[activeDay]||0} onChange={submitRating} saved={!!rateSaved[activeDay]}/>
+          {!rateSaved[activeDay] ? (
+            <>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",marginBottom:8}}>{t.rateTitle}</div>
+              <StarRating value={ratings[activeDay]||0} onChange={submitRating} saved={false}/>
+            </>
+          ) : (ratings[activeDay]||5) <= 3 && !ratingDir[activeDay] ? (
+            <>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",textAlign:"center",marginBottom:10}}>
+                {lang==="he"?"מה הייתה הבעיה?":"What was the issue?"}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>submitDirection("too_hot")} style={{flex:1,padding:"10px",borderRadius:12,border:"1px solid rgba(255,107,53,0.4)",background:"rgba(255,107,53,0.1)",color:"#FF6B35",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                  🥵 {lang==="he"?"חם מדי":"Too hot"}
+                </button>
+                <button onClick={()=>submitDirection("too_cold")} style={{flex:1,padding:"10px",borderRadius:12,border:"1px solid rgba(116,185,255,0.4)",background:"rgba(116,185,255,0.1)",color:"#74B9FF",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                  🥶 {lang==="he"?"קר מדי":"Too cold"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center"}}>{t.rateSaved}</div>
+          )}
         </div>
 
         <button onClick={onChangCity} style={{width:"100%",padding:"13px",background:"transparent",border:"1px solid #1a2535",borderRadius:14,color:"#778",fontSize:14,cursor:"pointer",fontFamily:"inherit",transition:"all .2s"}}
@@ -552,9 +581,12 @@ export default function App() {
   async function doFetchWeather(fetchCity:string,p:UserProfile){
     setLoading(true);setLoadingMsg(t.searching);setGlobalError("");setChangingCity(false);
     try{
-      const res=await fetch("/api/weather",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:fetchCity})});
-      const weather=await res.json();
-      if(!res.ok) throw new Error(
+      const [weatherRes, corrRes] = await Promise.all([
+        fetch("/api/weather",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:fetchCity})}),
+        fetch(`/api/ratings/correction?email=${encodeURIComponent(p.email)}`).then(r=>r.json()).catch(()=>({correction:0})),
+      ]);
+      const weather=await weatherRes.json();
+      if(!weatherRes.ok) throw new Error(
         weather.error==="rate_limit" ? (lang==="he"?"עומס זמני – נסה שוב בעוד כמה שניות":"Server busy – please try again in a few seconds") :
         weather.error==="city_not_found" ? t.cityNotFound(fetchCity) :
         weather.detail || t.weatherError
@@ -563,7 +595,8 @@ export default function App() {
       const age=calcAge(p.birthdate);
       const bmi=calcBMI(+p.weight,+p.height);
       const{genderOffset,bmiOffset,ageOffset}=getOffsets(p.gender,bmi,age);
-      const offset=genderOffset+bmiOffset+ageOffset;
+      const ratingOffset=corrRes.correction||0;
+      const offset=genderOffset+bmiOffset+ageOffset+ratingOffset;
       const todayFeel=weather.today.avg+offset;
       const tomorrowFeel=weather.tomorrow.avg+offset;
 

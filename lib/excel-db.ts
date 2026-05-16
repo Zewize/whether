@@ -21,6 +21,7 @@ export type RatingEntry = {
   day: "today" | "tomorrow";
   rating: number;
   feel_temp: number;
+  direction?: "too_hot" | "too_cold" | "";
 };
 
 async function loadWorkbook(): Promise<XLSX.WorkBook> {
@@ -87,10 +88,25 @@ export async function verifyOTP(email: string, code: string): Promise<boolean> {
 export async function saveRating(entry: RatingEntry) {
   const wb = await loadWorkbook();
   if (!wb.Sheets["ratings"]) {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","date","city","day","rating","feel_temp","created_at"]]), "ratings");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","date","city","day","rating","feel_temp","direction","created_at"]]), "ratings");
   }
   const data = XLSX.utils.sheet_to_json<RatingEntry & { created_at: string }>(wb.Sheets["ratings"]);
-  data.push({ ...entry, created_at: new Date().toISOString() });
+  const idx = data.findIndex(r => r.email === entry.email && r.date === entry.date && r.day === entry.day);
+  if (idx === -1) {
+    data.push({ ...entry, created_at: new Date().toISOString() });
+  } else {
+    data[idx] = { ...data[idx], ...entry };
+  }
   wb.Sheets["ratings"] = XLSX.utils.json_to_sheet(data);
   await saveWorkbook(wb);
+}
+
+export async function getRatingCorrection(email: string): Promise<number> {
+  const wb = await loadWorkbook();
+  if (!wb.Sheets["ratings"]) return 0;
+  const data = XLSX.utils.sheet_to_json<RatingEntry>(wb.Sheets["ratings"]);
+  const withDir = data.filter(r => r.email === email && (r.direction === "too_hot" || r.direction === "too_cold")).slice(-10);
+  if (!withDir.length) return 0;
+  const sum = withDir.reduce((acc, r) => acc + (r.direction === "too_hot" ? 1 : -1), 0);
+  return Math.max(-3, Math.min(3, Math.round(sum / withDir.length * 2)));
 }
