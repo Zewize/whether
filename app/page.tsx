@@ -115,7 +115,7 @@ function getClothingItems(feelTemp: number): ClothingItems {
     pants: feelTemp>=24?"short":"long",
     shoes: feelTemp>=26?"open":"closed",
     shirt: feelTemp>=22?"short":"long",
-    outer: feelTemp>=28?null:feelTemp>=18?"light":"coat",
+    outer: feelTemp>=22?null:feelTemp>=14?"light":"coat",
     accessories: feelTemp<=8,
   };
 }
@@ -244,9 +244,9 @@ function ClothingDisplay({items,lang}:{items:ClothingItems;lang:Lang}) {
     {icon:"👖",label:t.pants,value:items.pants==="short"?t.pantsShort:t.pantsLong},
     {icon:"👟",label:t.shoes,value:items.shoes==="open"?t.shoesOpen:t.shoesClosed},
     {icon:"👕",label:t.shirt,value:items.shirt==="short"?t.shirtShort:t.shirtLong},
-    {icon:items.outer==="coat"?"🧥":"🫧",label:items.outer==="coat"?t.outerCoat:items.outer==="light"?t.outerLight:t.noOuter,value:""},
+    ...(items.outer?[{icon:items.outer==="coat"?"🧥":"🫧",label:items.outer==="coat"?t.outerCoat:t.outerLight,value:""}]:[]),
     ...(items.accessories?[{icon:"🧤",label:t.accessories,value:""}]:[]),
-  ].filter(r=>r.label!==t.noOuter||items.outer===null);
+  ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
       {rows.map((r,i)=>(
