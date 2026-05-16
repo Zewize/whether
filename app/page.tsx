@@ -288,7 +288,7 @@ type WeatherResult = {
 // ─── RESULT CARD ──────────────────────────────────────────────────────────────
 function ResultCard({result,onChangCity,lang,email,onRateSubmit}:{result:WeatherResult;onChangCity:()=>void;lang:Lang;email:string;onRateSubmit:(day:"today"|"tomorrow",rating:number)=>void}) {
   const t=TR[lang];
-  const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("tomorrow");
+  const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("today");
   const [ratings,setRatings]=useState<{today?:number;tomorrow?:number}>({});
   const [rateSaved,setRateSaved]=useState<{today?:boolean;tomorrow?:boolean}>({});
 
@@ -476,6 +476,7 @@ export default function App() {
   const [result,setResult]=useState<WeatherResult|null>(null);
   const [locLoading,setLocLoading]=useState(false);
   const [sideMenuOpen,setSideMenuOpen]=useState(false);
+  const [changingCity,setChangingCity]=useState(false);
 
   const setF=(k:string)=>(v:string)=>{setForm(f=>({...f,[k]:v}));setErrors(e=>({...e,[k]:""}));setGlobalError("");};
 
@@ -544,7 +545,7 @@ export default function App() {
   }
 
   async function doFetchWeather(fetchCity:string,p:UserProfile){
-    setLoading(true);setLoadingMsg(t.searching);setGlobalError("");
+    setLoading(true);setLoadingMsg(t.searching);setGlobalError("");setChangingCity(false);
     try{
       const res=await fetch("/api/weather",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:fetchCity})});
       const weather=await res.json();
@@ -737,7 +738,7 @@ export default function App() {
         {/* WEATHER */}
         {view==="weather"&&profile&&(
           result?(
-            <ResultCard result={result} onChangCity={()=>setResult(null)} lang={lang} email={email} onRateSubmit={()=>{}}/>
+            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);}} lang={lang} email={email} onRateSubmit={()=>{}}/>
           ): loading?(
             <Card>
               <div style={{textAlign:"center",padding:"48px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:18}}>
@@ -745,12 +746,12 @@ export default function App() {
                 <p style={{color:"rgba(255,255,255,0.5)",fontSize:14}}>{loadingMsg||t.loading}</p>
               </div>
             </Card>
-          ):(
+          ): changingCity?(
             <Card>
               <SectionLabel icon="📍" text={t.cityForForecast}/>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <FieldWrap label={t.city} error={errors.city}>
-                  <TextInput value={city||profile.city} onChange={v=>{setCity(v);setErrors(e=>({...e,city:""}));}} placeholder={profile.city} error={errors.city}/>
+                  <TextInput value={city} onChange={v=>{setCity(v);setErrors(e=>({...e,city:""}));setGlobalError("");}} placeholder={profile.city} error={errors.city}/>
                 </FieldWrap>
                 <button onClick={()=>useMyLocation(setCity)} disabled={locLoading} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"rgba(255,255,255,0.4)",fontSize:12,padding:"8px 14px",cursor:"pointer",fontFamily:"inherit",opacity:locLoading?0.5:1,display:"flex",alignItems:"center",gap:6}}>
                   {locLoading?t.detecting:t.detectLocation}
@@ -759,6 +760,20 @@ export default function App() {
                 <PrimaryBtn onClick={()=>fetchWeather(city||profile.city)} loading={loading}>
                   {t.getRecommendation}
                 </PrimaryBtn>
+              </div>
+            </Card>
+          ):(
+            <Card>
+              <div style={{textAlign:"center",padding:"32px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+                {globalError?(
+                  <>
+                    <div style={{fontSize:36}}>⚠️</div>
+                    <p style={{color:"#FF8080",fontSize:14,lineHeight:1.6}}>{globalError}</p>
+                    <PrimaryBtn onClick={()=>fetchWeatherForProfile(profile)} loading={false}>{t.getRecommendation}</PrimaryBtn>
+                  </>
+                ):(
+                  <span style={{width:40,height:40,borderRadius:"50%",border:"3px solid rgba(255,255,255,0.1)",borderTopColor:"#F4A261",display:"inline-block",animation:"spin .7s linear infinite"}}/>
+                )}
               </div>
             </Card>
           )

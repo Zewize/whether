@@ -12,10 +12,12 @@ export async function POST(req: NextRequest) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
-  const prompt = `Search for the weather forecast for "${city}" for today (${fmt(today)}) and tomorrow (${fmt(tomorrow)}).
+  const prompt = `Search for the weather forecast for the city "${city}" for today (${fmt(today)}) and tomorrow (${fmt(tomorrow)}).
+The city name may be in Hebrew — search for it using both the Hebrew name and its English transliteration.
+For example, "חדרה" → search "Hadera Israel weather", "תל אביב" → "Tel Aviv weather", etc.
 After searching, reply with ONLY a single-line JSON object, no markdown, no extra text:
 {"today":{"min":<integer>,"max":<integer>,"uv":"low"|"medium"|"high","wind":"low"|"medium"|"high"},"tomorrow":{"min":<integer>,"max":<integer>,"uv":"low"|"medium"|"high","wind":"low"|"medium"|"high"},"city_he":"<city name in Hebrew>"}
-If the city does not exist reply: {"error":"not_found"}`;
+Only reply {"error":"not_found"} if the city genuinely does not exist anywhere in the world.`;
 
   const TOOLS = [{ type: "web_search_20250305", name: "web_search" }];
   let messages: { role: string; content: unknown }[] = [{ role: "user", content: prompt }];
