@@ -14,6 +14,15 @@ export type UserProfile = {
   city: string;
 };
 
+export type RatingEntry = {
+  email: string;
+  date: string;
+  city: string;
+  day: "today" | "tomorrow";
+  rating: number;
+  feel_temp: number;
+};
+
 async function loadWorkbook(): Promise<XLSX.WorkBook> {
   try {
     const { blobs } = await list({ prefix: BLOB_NAME });
@@ -34,6 +43,7 @@ function createEmpty(): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","name","phone","gender","birthdate","height","weight","city","created_at"]]), "users");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","code","expires_at"]]), "otps");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","date","city","day","rating","feel_temp","created_at"]]), "ratings");
   return wb;
 }
 
@@ -72,4 +82,15 @@ export async function verifyOTP(email: string, code: string): Promise<boolean> {
   const data = XLSX.utils.sheet_to_json<{ email: string; code: string; expires_at: string }>(wb.Sheets["otps"]);
   const row = data.find(r => r.email === email && r.code === code);
   return !!row && new Date(row.expires_at) > new Date();
+}
+
+export async function saveRating(entry: RatingEntry) {
+  const wb = await loadWorkbook();
+  if (!wb.Sheets["ratings"]) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","date","city","day","rating","feel_temp","created_at"]]), "ratings");
+  }
+  const data = XLSX.utils.sheet_to_json<RatingEntry & { created_at: string }>(wb.Sheets["ratings"]);
+  data.push({ ...entry, created_at: new Date().toISOString() });
+  wb.Sheets["ratings"] = XLSX.utils.json_to_sheet(data);
+  await saveWorkbook(wb);
 }
