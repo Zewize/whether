@@ -497,8 +497,8 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourDat
     <div style={{ background:C.card, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(0,0,0,0.1)", marginBottom:8 }}>
       {/* Scroll arrows + strip */}
       <div style={{ position:"relative" as const }}>
-        <button onClick={()=>ref.current&&(ref.current.scrollLeft-=200)} style={{ position:"absolute" as const, left:0, top:0, bottom:0, zIndex:2, background:"linear-gradient(to right,rgba(255,255,255,1) 60%,transparent)", border:"none", cursor:"pointer", padding:"0 14px 0 8px", fontSize:16, color:"#94a3b8" }}>‹</button>
-        <button onClick={()=>ref.current&&(ref.current.scrollLeft+=200)} style={{ position:"absolute" as const, right:0, top:0, bottom:0, zIndex:2, background:"linear-gradient(to left,rgba(255,255,255,1) 60%,transparent)", border:"none", cursor:"pointer", padding:"0 8px 0 14px", fontSize:16, color:"#94a3b8" }}>›</button>
+        <button dir="ltr" onClick={()=>ref.current&&(ref.current.scrollLeft-=200)} style={{ position:"absolute" as const, left:0, top:0, bottom:0, zIndex:2, background:"linear-gradient(to right,rgba(255,255,255,1) 60%,transparent)", border:"none", cursor:"pointer", padding:"0 14px 0 8px", fontSize:18, color:"#64748b", lineHeight:1 }}>‹</button>
+        <button dir="ltr" onClick={()=>ref.current&&(ref.current.scrollLeft+=200)} style={{ position:"absolute" as const, right:0, top:0, bottom:0, zIndex:2, background:"linear-gradient(to left,rgba(255,255,255,1) 60%,transparent)", border:"none", cursor:"pointer", padding:"0 8px 0 14px", fontSize:18, color:"#64748b", lineHeight:1 }}>›</button>
       {/* Scrollable strip */}
       <div ref={ref} dir="ltr" style={{ overflowX:"auto", display:"flex", padding:"10px 28px 8px", scrollbarWidth:"none" as const }}>
         {hourly.map((h,i)=>{
