@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { UserProfile } from "@/lib/excel-db";
 
 // ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
@@ -372,11 +372,130 @@ function StarRating({ value, onChange, saved }: { value:number; onChange:(v:numb
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type DayWeather = { min:number; max:number; avg:number; uv:"low"|"medium"|"high"; wind:"low"|"medium"|"high" };
+type HourData = { localHour:number; temp:number; code:number; isDay:boolean };
 type WeatherResult = {
   today:DayWeather; tomorrow:DayWeather; cityHe:string;
   todayFeel:number; tomorrowFeel:number;
   todayDateStr:string; tomorrowDateStr:string;
+  todayHourly:HourData[]; tomorrowHourly:HourData[];
+  feelOffset:number;
 };
+
+// ─── WEATHER SVG ICONS ────────────────────────────────────────────────────────
+function SunIcon({size=22}:{size?:number}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="4.5" fill="#FBBF24"/>
+      <g stroke="#F59E0B" strokeWidth="1.6" strokeLinecap="round">
+        <line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/>
+        <line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/>
+        <line x1="5.4" y1="5.4" x2="7.1" y2="7.1"/><line x1="16.9" y1="16.9" x2="18.6" y2="18.6"/>
+        <line x1="18.6" y1="5.4" x2="16.9" y2="7.1"/><line x1="7.1" y1="16.9" x2="5.4" y2="18.6"/>
+      </g>
+    </svg>
+  );
+}
+function MoonIcon({size=22}:{size?:number}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="#FCD34D"/>
+    </svg>
+  );
+}
+function CloudIcon({size=22,color="#94A3B8"}:{size?:number;color?:string}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M18 10h-.3C17.1 7.2 14.8 5 12 5A6 6 0 0 0 6.3 9.2 4.5 4.5 0 0 0 7.5 18h10.5A4 4 0 0 0 18 10z" fill={color}/>
+    </svg>
+  );
+}
+function PartlyCloudyIcon({size=22}:{size?:number}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="10" cy="9" r="4" fill="#FBBF24"/>
+      <g stroke="#F59E0B" strokeWidth="1.3" strokeLinecap="round">
+        <line x1="10" y1="3" x2="10" y2="4.5"/><line x1="3" y1="9" x2="4.5" y2="9"/>
+        <line x1="15.5" y1="9" x2="17" y2="9"/>
+        <line x1="5.4" y1="4.4" x2="6.5" y2="5.5"/><line x1="14.6" y1="4.4" x2="13.5" y2="5.5"/>
+      </g>
+      <path d="M19 14h-.2c-.4-1.8-2-3-3.8-3A4 4 0 0 0 11 14.2 3.5 3.5 0 0 0 12 21h7A2.5 2.5 0 0 0 19 14z" fill="#CBD5E1"/>
+    </svg>
+  );
+}
+function RainIcon({size=22}:{size?:number}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M18 10h-.3C17.1 7.2 14.8 5 12 5A6 6 0 0 0 6.3 9.2 4.5 4.5 0 0 0 7.5 18h10.5A4 4 0 0 0 18 10z" fill="#94A3B8"/>
+      <g stroke="#60A5FA" strokeWidth="1.6" strokeLinecap="round">
+        <line x1="8" y1="19.5" x2="7" y2="21.5"/><line x1="12" y1="19.5" x2="11" y2="21.5"/><line x1="16" y1="19.5" x2="15" y2="21.5"/>
+      </g>
+    </svg>
+  );
+}
+function SnowIcon({size=22}:{size?:number}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M18 10h-.3C17.1 7.2 14.8 5 12 5A6 6 0 0 0 6.3 9.2 4.5 4.5 0 0 0 7.5 18h10.5A4 4 0 0 0 18 10z" fill="#CBD5E1"/>
+      <g stroke="#BAE6FD" strokeWidth="1.5" strokeLinecap="round">
+        <line x1="9" y1="20" x2="9" y2="22"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/>
+      </g>
+    </svg>
+  );
+}
+function WeatherIcon({code,isDay,size=22}:{code:number;isDay:boolean;size?:number}) {
+  if (code === 0) return isDay ? <SunIcon size={size}/> : <MoonIcon size={size}/>;
+  if (code <= 2) return isDay ? <PartlyCloudyIcon size={size}/> : <MoonIcon size={size}/>;
+  if (code <= 3) return <CloudIcon size={size}/>;
+  if (code <= 48) return <CloudIcon size={size} color="#B0BEC5"/>;
+  if (code <= 77) return code <= 67 ? <RainIcon size={size}/> : <SnowIcon size={size}/>;
+  return <RainIcon size={size}/>;
+}
+
+// ─── CLOTHING MINI BADGE ──────────────────────────────────────────────────────
+function ClothingMiniBadge({feel,lang}:{feel:number;lang:Lang}) {
+  const t=TR[lang];
+  const cfg = feel>=24 ? {label:t.shirtShort, bg:"#bbf7d0", color:"#166534"}
+    : feel>=18 ? {label:t.shirtLong, bg:"#bfdbfe", color:"#1e40af"}
+    : feel>=12 ? {label:t.outerLight, bg:"#fed7aa", color:"#c2410c"}
+    : {label:t.outerCoat, bg:"#ddd6fe", color:"#4338ca"};
+  return (
+    <div style={{ padding:"2px 5px", borderRadius:6, background:cfg.bg, fontSize:9, fontWeight:700, color:cfg.color, letterSpacing:"0.02em", textAlign:"center" as const, whiteSpace:"nowrap" as const }}>
+      {cfg.label}
+    </div>
+  );
+}
+
+// ─── HOURLY STRIP ─────────────────────────────────────────────────────────────
+function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourData[]; feelOffset:number; lang:Lang; currentHour:number }) {
+  const ref=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(ref.current){
+      const idx=hourly.findIndex(h=>h.localHour>=currentHour);
+      if(idx>0) ref.current.scrollLeft=Math.max(0,(idx-1)*66);
+    }
+  },[]);
+  return (
+    <div style={{ background:C.card, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(0,0,0,0.1)", marginBottom:8 }}>
+      <div ref={ref} dir="ltr" style={{ overflowX:"auto", display:"flex", padding:"10px 6px", gap:0, scrollbarWidth:"none" as const }}>
+        {hourly.map((h,i)=>{
+          const feel=h.temp+feelOffset;
+          const isCurrent=h.localHour===currentHour;
+          return (
+            <div key={i} style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:5, padding:"8px 10px", borderRadius:12, minWidth:62, flexShrink:0,
+              background:isCurrent?"rgba(30,58,110,0.09)":"transparent", transition:"background .2s" }}>
+              <div style={{ fontSize:10, fontWeight:isCurrent?700:500, color:isCurrent?"#1e3a6e":"#64748b", letterSpacing:"0.01em" }}>
+                {String(h.localHour).padStart(2,"0")}:00
+              </div>
+              <WeatherIcon code={h.code} isDay={h.isDay} size={24}/>
+              <div style={{ fontSize:13, fontWeight:700, color:"#1e293b" }}>{h.temp}°</div>
+              <ClothingMiniBadge feel={feel} lang={lang}/>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ─── RESULT CARD ──────────────────────────────────────────────────────────────
 function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChange }: {
@@ -439,6 +558,14 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
           ))}
         </div>
       </div>
+
+      {/* Hourly strip */}
+      {(() => {
+        const hourly = activeDay==="today" ? result.todayHourly : result.tomorrowHourly;
+        if (!hourly?.length) return null;
+        const currentHour = activeDay==="today" ? new Date().getHours() : 0;
+        return <HourlyStrip hourly={hourly} feelOffset={result.feelOffset} lang={lang} currentHour={currentHour}/>;
+      })()}
 
       {/* Details card */}
       <Card style={{ marginBottom:8 }}>
@@ -706,7 +833,9 @@ export default function App() {
       setActiveSky(getSkyTheme(todayFeel));
       setResult({ today:{...weather.today}, tomorrow:{...weather.tomorrow}, cityHe:weather.cityHe,
         todayFeel, tomorrowFeel:weather.tomorrow.avg+offset,
-        todayDateStr:now.toLocaleDateString(loc,opts), tomorrowDateStr:tom.toLocaleDateString(loc,opts) });
+        todayDateStr:now.toLocaleDateString(loc,opts), tomorrowDateStr:tom.toLocaleDateString(loc,opts),
+        todayHourly:weather.todayHourly||[], tomorrowHourly:weather.tomorrowHourly||[],
+        feelOffset:offset });
     }catch(e:unknown){setGlobalError(e instanceof Error?e.message:t.weatherError);}
     finally{setLoading(false);setLoadingMsg("");}
   }

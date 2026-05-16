@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
   const { city } = await req.json();
   if (!city) return NextResponse.json({ error: "missing city" }, { status: 400 });
 
-  // 1. Geocode the city (supports Hebrew names)
   const geoRes = await fetch(
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=he&format=json`,
     { headers: { "User-Agent": "What2wear/1.0" } }
@@ -31,10 +30,10 @@ export async function POST(req: NextRequest) {
 
   const { latitude, longitude, name } = geoData.results[0];
 
-  // 2. Fetch weather forecast (today + tomorrow)
   const weatherRes = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
     `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,wind_speed_10m_max` +
+    `&hourly=temperature_2m,weather_code,is_day` +
     `&timezone=auto&forecast_days=2`,
     { headers: { "User-Agent": "What2wear/1.0" } }
   );
@@ -42,6 +41,7 @@ export async function POST(req: NextRequest) {
 
   const w = await weatherRes.json();
   const d = w.daily;
+  const h = w.hourly;
 
   const makeDay = (i: number) => ({
     min: Math.round(d.temperature_2m_min[i]),
@@ -51,9 +51,19 @@ export async function POST(req: NextRequest) {
     wind: windLevel(d.wind_speed_10m_max[i] ?? 0),
   });
 
+  const makeHourly = (dayIdx: number) =>
+    Array.from({ length: 24 }, (_, i) => ({
+      localHour: i,
+      temp: Math.round(h.temperature_2m[dayIdx * 24 + i] ?? 0),
+      code: h.weather_code[dayIdx * 24 + i] ?? 0,
+      isDay: h.is_day[dayIdx * 24 + i] === 1,
+    }));
+
   return NextResponse.json({
     today: makeDay(0),
     tomorrow: makeDay(1),
     cityHe: name,
+    todayHourly: makeHourly(0),
+    tomorrowHourly: makeHourly(1),
   });
 }
