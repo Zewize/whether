@@ -53,6 +53,11 @@ async function saveWorkbook(wb: XLSX.WorkBook) {
   await put(BLOB_NAME, buf, { access: "private", allowOverwrite: true });
 }
 
+export async function getAllUsers(): Promise<UserProfile[]> {
+  const wb = await loadWorkbook();
+  return XLSX.utils.sheet_to_json<UserProfile>(wb.Sheets["users"]);
+}
+
 export async function getUserByEmail(email: string): Promise<UserProfile | null> {
   const wb = await loadWorkbook();
   const data = XLSX.utils.sheet_to_json<UserProfile>(wb.Sheets["users"]);
