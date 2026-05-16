@@ -451,48 +451,93 @@ function WeatherIcon({code,isDay,size=22}:{code:number;isDay:boolean;size?:numbe
   return <RainIcon size={size}/>;
 }
 
-// ─── CLOTHING MINI BADGE ──────────────────────────────────────────────────────
-function ClothingMiniBadge({feel,lang}:{feel:number;lang:Lang}) {
-  const t=TR[lang];
-  const cfg = feel>=24 ? {label:t.shirtShort, bg:"#bbf7d0", color:"#166534"}
-    : feel>=18 ? {label:t.shirtLong, bg:"#bfdbfe", color:"#1e40af"}
-    : feel>=12 ? {label:t.outerLight, bg:"#fed7aa", color:"#c2410c"}
-    : {label:t.outerCoat, bg:"#ddd6fe", color:"#4338ca"};
+// ─── CLOTHING STRIP ICON ──────────────────────────────────────────────────────
+function ClothingStripIcon({ feel }: { feel: number }) {
+  if (feel >= 24) return (
+    <svg width={26} height={28} viewBox="0 0 26 28" fill="none">
+      <path d="M9 2L5 6L9 9V24H17V9L21 6L17 2L15 4.5C14.3 5.4 13.7 5.8 13 5.8S11.7 5.4 11 4.5Z" fill="#4ADE80"/>
+    </svg>
+  );
+  if (feel >= 18) return (
+    <svg width={26} height={28} viewBox="0 0 26 28" fill="none">
+      <path d="M9 2L4 6L9 10V24H17V10L22 6L17 2L15 4.5C14.3 5.4 13.7 5.8 13 5.8S11.7 5.4 11 4.5Z" fill="#60A5FA"/>
+    </svg>
+  );
+  if (feel >= 12) return (
+    <svg width={26} height={28} viewBox="0 0 26 28" fill="none">
+      <path d="M9 2L4 6L9 10V24H13V17H13V24H17V10L22 6L17 2L15 4.5C14.3 5.4 13.7 5.8 13 5.8S11.7 5.4 11 4.5Z" fill="#FB923C"/>
+      <line x1="13" y1="10" x2="13" y2="24" stroke="rgba(255,255,255,0.55)" strokeWidth="1"/>
+    </svg>
+  );
   return (
-    <div style={{ padding:"2px 5px", borderRadius:6, background:cfg.bg, fontSize:9, fontWeight:700, color:cfg.color, letterSpacing:"0.02em", textAlign:"center" as const, whiteSpace:"nowrap" as const }}>
-      {cfg.label}
-    </div>
+    <svg width={26} height={28} viewBox="0 0 26 28" fill="none">
+      <path d="M8 2L3 6L8 10V26H13V18H13V26H18V10L23 6L18 2L15.5 4.5C14.7 5.4 13.9 5.8 13 5.8S11.3 5.4 10.5 4.5Z" fill="#818CF8"/>
+      <line x1="13" y1="10" x2="13" y2="26" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
+    </svg>
   );
 }
 
 // ─── HOURLY STRIP ─────────────────────────────────────────────────────────────
 function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourData[]; feelOffset:number; lang:Lang; currentHour:number }) {
+  const [selHour,setSelHour]=useState(currentHour);
   const ref=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(ref.current){
       const idx=hourly.findIndex(h=>h.localHour>=currentHour);
-      if(idx>0) ref.current.scrollLeft=Math.max(0,(idx-1)*66);
+      if(idx>0) ref.current.scrollLeft=Math.max(0,(idx-1)*64);
     }
   },[]);
+
+  const selData=hourly.find(h=>h.localHour===selHour)||hourly[0];
+  const selFeel=(selData?.temp||0)+feelOffset;
+  const selClothing=getClothingItems(selFeel);
+  const t=TR[lang];
+
   return (
     <div style={{ background:C.card, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(0,0,0,0.1)", marginBottom:8 }}>
-      <div ref={ref} dir="ltr" style={{ overflowX:"auto", display:"flex", padding:"10px 6px", gap:0, scrollbarWidth:"none" as const }}>
+      {/* Scrollable strip */}
+      <div ref={ref} dir="ltr" style={{ overflowX:"auto", display:"flex", padding:"10px 6px 8px", scrollbarWidth:"none" as const }}>
         {hourly.map((h,i)=>{
           const feel=h.temp+feelOffset;
-          const isCurrent=h.localHour===currentHour;
+          const isSel=h.localHour===selHour;
           return (
-            <div key={i} style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:5, padding:"8px 10px", borderRadius:12, minWidth:62, flexShrink:0,
-              background:isCurrent?"rgba(30,58,110,0.09)":"transparent", transition:"background .2s" }}>
-              <div style={{ fontSize:10, fontWeight:isCurrent?700:500, color:isCurrent?"#1e3a6e":"#64748b", letterSpacing:"0.01em" }}>
+            <div key={i} onClick={()=>setSelHour(h.localHour)} onMouseEnter={()=>setSelHour(h.localHour)}
+              style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:4, padding:"8px 8px", borderRadius:12, minWidth:60, flexShrink:0, cursor:"pointer",
+                background:isSel?"rgba(30,58,110,0.08)":"transparent", transition:"background .15s" }}>
+              <div style={{ fontSize:10, fontWeight:isSel?700:500, color:isSel?"#1e3a6e":"#64748b" }}>
                 {String(h.localHour).padStart(2,"0")}:00
               </div>
-              <WeatherIcon code={h.code} isDay={h.isDay} size={24}/>
-              <div style={{ fontSize:13, fontWeight:700, color:"#1e293b" }}>{h.temp}°</div>
-              <ClothingMiniBadge feel={feel} lang={lang}/>
+              <WeatherIcon code={h.code} isDay={h.isDay} size={22}/>
+              <div style={{ fontSize:12, fontWeight:700, color:"#1e293b" }}>{h.temp}°</div>
+              <ClothingStripIcon feel={feel}/>
             </div>
           );
         })}
       </div>
+
+      {/* Recommendation panel for selected hour */}
+      {selData && (
+        <div style={{ borderTop:`1px solid ${C.border}`, padding:"12px 16px" }}>
+          <div style={{ fontSize:11, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:6, direction:"ltr" }}>
+            <span style={{ fontWeight:700, color:"#1e3a6e", fontSize:13 }}>{String(selHour).padStart(2,"0")}:00</span>
+            <span>·</span>
+            <span>{lang==="he"?"תחושה":"Feel"} {selFeel}°</span>
+          </div>
+          <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6 }}>
+            {[
+              `${t.pants}: ${selClothing.pants==="short"?t.pantsShort:t.pantsLong}`,
+              `${t.shoes}: ${selClothing.shoes==="open"?t.shoesOpen:t.shoesClosed}`,
+              `${t.shirt}: ${selClothing.shirt==="short"?t.shirtShort:t.shirtLong}`,
+              ...(selClothing.outer?[selClothing.outer==="coat"?t.outerCoat:t.outerLight]:[]),
+              ...(selClothing.accessories?[t.accessories]:[]),
+            ].map((item,i)=>(
+              <span key={i} style={{ padding:"4px 11px", background:"rgba(30,58,110,0.07)", borderRadius:20, fontSize:12, color:"#1e293b", fontWeight:500 }}>
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
