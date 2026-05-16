@@ -486,7 +486,12 @@ export default function App() {
     if (savedLang) setLang(savedLang);
     if (saved) {
       fetch(`/api/users/get?email=${encodeURIComponent(saved)}`).then(r=>r.json()).then(data=>{
-        if (data?.email){setProfile(data);setEmail(saved);setView("weather");}
+        if (data?.email){
+          setProfile(data);
+          setEmail(saved);
+          setView("weather");
+          setTimeout(()=>fetchWeatherForProfile(data),100);
+        }
       }).catch(()=>{});
     }
   },[]);
