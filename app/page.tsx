@@ -548,7 +548,11 @@ export default function App() {
     try{
       const res=await fetch("/api/weather",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({city:fetchCity})});
       const weather=await res.json();
-      if(!res.ok) throw new Error(weather.detail||(weather.error==="city_not_found"?t.cityNotFound(fetchCity):t.weatherError));
+      if(!res.ok) throw new Error(
+        weather.error==="rate_limit" ? (lang==="he"?"עומס זמני – נסה שוב בעוד כמה שניות":"Server busy – please try again in a few seconds") :
+        weather.error==="city_not_found" ? t.cityNotFound(fetchCity) :
+        weather.detail || t.weatherError
+      );
       setLoadingMsg(t.calculating);
       const age=calcAge(p.birthdate);
       const bmi=calcBMI(+p.weight,+p.height);
@@ -734,6 +738,13 @@ export default function App() {
         {view==="weather"&&profile&&(
           result?(
             <ResultCard result={result} onChangCity={()=>setResult(null)} lang={lang} email={email} onRateSubmit={()=>{}}/>
+          ): loading?(
+            <Card>
+              <div style={{textAlign:"center",padding:"48px 0",display:"flex",flexDirection:"column",alignItems:"center",gap:18}}>
+                <span style={{width:40,height:40,borderRadius:"50%",border:"3px solid rgba(255,255,255,0.1)",borderTopColor:"#F4A261",display:"inline-block",animation:"spin .7s linear infinite"}}/>
+                <p style={{color:"rgba(255,255,255,0.5)",fontSize:14}}>{loadingMsg||t.loading}</p>
+              </div>
+            </Card>
           ):(
             <Card>
               <SectionLabel icon="📍" text={t.cityForForecast}/>
@@ -746,7 +757,7 @@ export default function App() {
                 </button>
                 {globalError&&<ErrorBox>{globalError}</ErrorBox>}
                 <PrimaryBtn onClick={()=>fetchWeather(city||profile.city)} loading={loading}>
-                  {loading?loadingMsg||t.loading:t.getRecommendation}
+                  {t.getRecommendation}
                 </PrimaryBtn>
               </div>
             </Card>

@@ -30,7 +30,12 @@ If the city does not exist reply: {"error":"not_found"}`;
 
     if (!res.ok) {
       const errText = await res.text();
-      return NextResponse.json({ error: "anthropic error", detail: errText.slice(0, 200) }, { status: 500 });
+      let errJson: { error?: { type?: string } } = {};
+      try { errJson = JSON.parse(errText); } catch {}
+      if (errJson?.error?.type === "rate_limit_error") {
+        return NextResponse.json({ error: "rate_limit" }, { status: 429 });
+      }
+      return NextResponse.json({ error: "anthropic error", detail: errText.slice(0, 120) }, { status: 500 });
     }
     const data = await res.json();
 
