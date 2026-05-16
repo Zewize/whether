@@ -686,25 +686,44 @@ function AdminPanel() {
   useEffect(()=>{
     fetch("/api/admin/stats").then(r=>r.json()).then(d=>setStats(d)).finally(()=>setLoading(false));
   },[]);
-  const row=(label:string,value:string)=>(
-    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:`1px solid rgba(0,0,0,0.06)` }}>
-      <span style={{ fontSize:12, color:"#64748b" }}>{label}</span>
-      <span style={{ fontSize:14, fontWeight:700, color:"#1e293b" }}>{value}</span>
+
+  const kpi=(value:string,label:string,sub:string,accent:string,bg:string)=>(
+    <div style={{ background:bg, borderRadius:14, padding:"14px 16px", border:`1px solid ${accent}22`, position:"relative" as const, overflow:"hidden" as const }}>
+      <div style={{ position:"absolute" as const, top:-10, left:-10, width:60, height:60, borderRadius:"50%", background:`${accent}12` }}/>
+      <div style={{ fontSize:11, fontWeight:600, color:accent, letterSpacing:"0.06em", textTransform:"uppercase" as const, marginBottom:6 }}>{label}</div>
+      <div style={{ fontSize:28, fontWeight:800, color:"#1e293b", lineHeight:1 }}>{value}</div>
+      <div style={{ fontSize:11, color:"#94a3b8", marginTop:5 }}>{sub}</div>
     </div>
   );
+
+  const stars=(n:number)=>"★".repeat(Math.round(n))+"☆".repeat(5-Math.round(n));
+
   return (
     <div style={{ marginTop:24 }}>
-      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#94a3b8", marginBottom:12 }}>Admin Dashboard</div>
-      {loading ? <div style={{ fontSize:12, color:"#94a3b8", textAlign:"center", padding:"16px 0" }}>טוען...</div> : stats ? (
-        <>
-          <div style={{ background:"#f8fafc", borderRadius:12, padding:"4px 14px", border:"1px solid rgba(0,0,0,0.06)" }}>
-            {row("משתמשים רשומים", String(stats.userCount))}
-            {row("דירוגים שנשמרו", String(stats.ratingCount))}
-            {row("ממוצע דירוג", stats.ratingCount ? `${stats.avgRating} / 5 ★` : "אין עדיין")}
-            {row("עלות AI", "₪0 — ללא שימוש ב-AI")}
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+        <div style={{ width:3, height:16, borderRadius:2, background:"#1e3a6e" }}/>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#64748b" }}>KPI Dashboard</div>
+      </div>
+
+      {loading ? (
+        <div style={{ display:"flex", justifyContent:"center", padding:"24px 0" }}><Spin/></div>
+      ) : stats ? (
+        <div style={{ display:"flex", flexDirection:"column" as const, gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            {kpi(String(stats.userCount), "משתמשים", "נרשמו לאפליקציה", "#6366f1", "#f5f3ff")}
+            {kpi(String(stats.ratingCount), "דירוגים", "סה״כ שנשמרו", "#0ea5e9", "#f0f9ff")}
           </div>
-        </>
-      ) : <div style={{ fontSize:12, color:"#ef4444" }}>שגיאה בטעינה</div>}
+          {kpi(
+            stats.ratingCount ? `${stats.avgRating} / 5` : "—",
+            "ממוצע דירוג",
+            stats.ratingCount ? stars(stats.avgRating) : "אין דירוגים עדיין",
+            "#f59e0b", "#fffbeb"
+          )}
+          {kpi("₪0", "עלות AI", "לא נעשה שימוש ב-AI", "#10b981", "#f0fdf4")}
+        </div>
+      ) : (
+        <div style={{ fontSize:12, color:"#ef4444", textAlign:"center", padding:"12px 0" }}>שגיאה בטעינה</div>
+      )}
     </div>
   );
 }
