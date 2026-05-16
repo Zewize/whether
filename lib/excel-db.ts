@@ -22,6 +22,7 @@ export type RatingEntry = {
   rating: number;
   feel_temp: number;
   direction?: "too_hot" | "too_cold" | "";
+  feedback?: string;
 };
 
 async function loadWorkbook(): Promise<XLSX.WorkBook> {

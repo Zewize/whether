@@ -556,11 +556,16 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
   const [ratings,setRatings]=useState<{today?:number;tomorrow?:number}>({});
   const [rateSaved,setRateSaved]=useState<{today?:boolean;tomorrow?:boolean}>({});
   const [ratingDir,setRatingDir]=useState<{today?:string;tomorrow?:string}>({});
+  const [feedbackText,setFeedbackText]=useState<{today?:string;tomorrow?:string}>({});
+  const [feedbackSaved,setFeedbackSaved]=useState<{today?:boolean;tomorrow?:boolean}>({});
 
   const dayData=activeDay==="today"?result.today:result.tomorrow;
   const feel=activeDay==="today"?result.todayFeel:result.tomorrowFeel;
-  const dateStr=activeDay==="today"?result.todayDateStr:result.tomorrowDateStr;
   const sky=getSkyTheme(feel);
+  const _now=new Date(); const _tom=new Date(); _tom.setDate(_tom.getDate()+1);
+  const _loc=lang==="he"?"he-IL":"en-US";
+  const _opts:Intl.DateTimeFormatOptions={weekday:"long",day:"numeric",month:"long"};
+  const dateStr=activeDay==="today"?_now.toLocaleDateString(_loc,_opts):_tom.toLocaleDateString(_loc,_opts);
 
   useEffect(()=>{ onSkyChange(sky); },[feel]);
   const clothing=getClothingItems(feel);
@@ -578,6 +583,15 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
     try {
       await fetch("/api/ratings/save",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({email,city:result.cityHe,day:activeDay,rating:ratings[activeDay],feel_temp:feel,direction:dir})});
+    } catch {}
+  }
+  async function submitFeedback() {
+    const text=(feedbackText[activeDay]||"").trim();
+    setFeedbackSaved(f=>({...f,[activeDay]:true}));
+    if(!text) return;
+    try {
+      await fetch("/api/ratings/save",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email,city:result.cityHe,day:activeDay,rating:ratings[activeDay],feel_temp:feel,direction:ratingDir[activeDay]||"",feedback:text})});
     } catch {}
   }
 
@@ -654,6 +668,23 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
               </button>
             </div>
           </>
+        ) : !feedbackSaved[activeDay] ? (
+          <>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.08em", textTransform:"uppercase" as const, color:C.textMuted, textAlign:"center", marginBottom:10 }}>
+              {lang==="he"?"השאר הערה (אופציונלי)":"Leave a note (optional)"}
+            </div>
+            <textarea value={feedbackText[activeDay]||""} onChange={e=>setFeedbackText(f=>({...f,[activeDay]:e.target.value}))}
+              placeholder={lang==="he"?"מה חשבת על ההמלצה?":"What did you think of the recommendation?"}
+              rows={2} style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:`1.5px solid ${C.border}`, background:C.inputBg, fontSize:13, color:C.text, fontFamily:"inherit", resize:"none" as const, outline:"none", boxSizing:"border-box" as const, direction:lang==="he"?"rtl":"ltr" }}/>
+            <div style={{ display:"flex", gap:8, marginTop:10 }}>
+              <button onClick={submitFeedback} style={{ flex:2, padding:"9px", borderRadius:10, border:"none", background:"#1e3a6e", color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                {lang==="he"?"שלח":"Send"}
+              </button>
+              <button onClick={()=>setFeedbackSaved(f=>({...f,[activeDay]:true}))} style={{ flex:1, padding:"9px", borderRadius:10, border:`1px solid ${C.border}`, background:"transparent", color:C.textMuted, fontSize:12, cursor:"pointer", fontFamily:"inherit" }}>
+                {lang==="he"?"דלג":"Skip"}
+              </button>
+            </div>
+          </>
         ) : (
           <div style={{ fontSize:12, color:C.textMuted, textAlign:"center" }}>{t.rateSaved}</div>
         )}
@@ -667,7 +698,8 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
 }
 
 // ─── PROFILE DRAWER ───────────────────────────────────────────────────────────
-type AdminStats = { userCount:number; ratingCount:number; avgRating:number; tokenCostNis:number };
+type FeedbackItem = { email:string; rating:number; feedback?:string; date:string; city:string };
+type AdminStats = { userCount:number; ratingCount:number; avgRating:number; tokenCostNis:number; recentFeedbacks:FeedbackItem[] };
 
 function AdminPanel() {
   const [stats,setStats]=useState<AdminStats|null>(null);
@@ -683,14 +715,36 @@ function AdminPanel() {
   );
   return (
     <div style={{ marginTop:24 }}>
-      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#94a3b8", marginBottom:12 }}>🛡 Admin Dashboard</div>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#94a3b8", marginBottom:12 }}>Admin Dashboard</div>
       {loading ? <div style={{ fontSize:12, color:"#94a3b8", textAlign:"center", padding:"16px 0" }}>טוען...</div> : stats ? (
-        <div style={{ background:"#f8fafc", borderRadius:12, padding:"4px 14px", border:"1px solid rgba(0,0,0,0.06)" }}>
-          {row("משתמשים רשומים", String(stats.userCount))}
-          {row("דירוגים שנשמרו", String(stats.ratingCount))}
-          {row("ממוצע דירוג", stats.ratingCount ? `${stats.avgRating} / 5 ★` : "אין עדיין")}
-          {row("עלות AI (₪)", "₪0 — לא נעשה שימוש ב-AI")}
-        </div>
+        <>
+          <div style={{ background:"#f8fafc", borderRadius:12, padding:"4px 14px", border:"1px solid rgba(0,0,0,0.06)", marginBottom:16 }}>
+            {row("משתמשים רשומים", String(stats.userCount))}
+            {row("דירוגים שנשמרו", String(stats.ratingCount))}
+            {row("ממוצע דירוג", stats.ratingCount ? `${stats.avgRating} / 5 ★` : "אין עדיין")}
+            {row("עלות AI", "₪0 — ללא שימוש ב-AI")}
+          </div>
+          {stats.recentFeedbacks?.length > 0 && (
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" as const, color:"#94a3b8", marginBottom:10 }}>פידבקים אחרונים</div>
+              <div style={{ display:"flex", flexDirection:"column" as const, gap:8 }}>
+                {stats.recentFeedbacks.map((f,i)=>(
+                  <div key={i} style={{ background:"#f8fafc", borderRadius:10, padding:"10px 12px", border:"1px solid rgba(0,0,0,0.06)" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                      <span style={{ fontSize:11, color:"#64748b" }}>{f.email}</span>
+                      <span style={{ fontSize:11, color:"#f59e0b", fontWeight:700 }}>{"★".repeat(f.rating||0)}</span>
+                    </div>
+                    <div style={{ fontSize:13, color:"#1e293b", lineHeight:1.5 }}>{f.feedback}</div>
+                    <div style={{ fontSize:10, color:"#94a3b8", marginTop:4 }}>{f.date} · {f.city}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {stats.recentFeedbacks?.length === 0 && (
+            <div style={{ fontSize:12, color:"#94a3b8", textAlign:"center", padding:"8px 0" }}>אין פידבקים עדיין</div>
+          )}
+        </>
       ) : <div style={{ fontSize:12, color:"#ef4444" }}>שגיאה בטעינה</div>}
     </div>
   );
