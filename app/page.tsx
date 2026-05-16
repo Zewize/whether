@@ -590,8 +590,8 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
     setFeedbackSaved(f=>({...f,[activeDay]:true}));
     if(!text) return;
     try {
-      await fetch("/api/ratings/save",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({email,city:result.cityHe,day:activeDay,rating:ratings[activeDay],feel_temp:feel,direction:ratingDir[activeDay]||"",feedback:text})});
+      await fetch("/api/ratings/feedback",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email,text,rating:ratings[activeDay]||0,city:result.cityHe,day:activeDay})});
     } catch {}
   }
 

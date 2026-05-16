@@ -45,8 +45,28 @@ function createEmpty(): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","name","phone","gender","birthdate","height","weight","city","created_at"]]), "users");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","code","expires_at"]]), "otps");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","date","city","day","rating","feel_temp","created_at"]]), "ratings");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","date","city","day","rating","feel_temp","direction","created_at"]]), "ratings");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","text","rating","city","day","created_at"]]), "feedbacks");
   return wb;
+}
+
+export type FeedbackEntry = { email:string; text:string; rating:number; city:string; day:string; created_at:string };
+
+export async function saveFeedback(entry: Omit<FeedbackEntry,"created_at">) {
+  const wb = await loadWorkbook();
+  if (!wb.Sheets["feedbacks"]) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["email","text","rating","city","day","created_at"]]), "feedbacks");
+  }
+  const data = XLSX.utils.sheet_to_json<FeedbackEntry>(wb.Sheets["feedbacks"]);
+  data.push({ ...entry, created_at: new Date().toISOString() });
+  wb.Sheets["feedbacks"] = XLSX.utils.json_to_sheet(data);
+  await saveWorkbook(wb);
+}
+
+export async function getAllFeedbacks(): Promise<FeedbackEntry[]> {
+  const wb = await loadWorkbook();
+  if (!wb.Sheets["feedbacks"]) return [];
+  return XLSX.utils.sheet_to_json<FeedbackEntry>(wb.Sheets["feedbacks"]);
 }
 
 async function saveWorkbook(wb: XLSX.WorkBook) {

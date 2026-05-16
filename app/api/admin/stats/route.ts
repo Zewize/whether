@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
-import { getAllUsers, getAllRatings } from "@/lib/excel-db";
+import { getAllUsers, getAllRatings, getAllFeedbacks } from "@/lib/excel-db";
 
 export async function GET() {
   try {
-    const [users, ratings] = await Promise.all([getAllUsers(), getAllRatings()]);
+    const [users, ratings, feedbacks] = await Promise.all([getAllUsers(), getAllRatings(), getAllFeedbacks()]);
     const avgRating = ratings.length
       ? ratings.reduce((a, r) => a + (r.rating || 0), 0) / ratings.length
       : 0;
-    const recentFeedbacks = ratings
-      .filter(r => r.feedback && String(r.feedback).trim())
+    const recentFeedbacks = feedbacks
       .slice(-30)
       .reverse()
-      .map(r => ({ email: r.email, rating: r.rating, feedback: r.feedback, date: r.date, city: r.city }));
+      .map(f => ({ email: f.email, rating: f.rating, feedback: f.text, date: f.created_at?.slice(0,10), city: f.city }));
     return NextResponse.json({
       userCount: users.length,
       ratingCount: ratings.length,
