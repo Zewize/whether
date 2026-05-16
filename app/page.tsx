@@ -353,8 +353,8 @@ type WeatherResult = {
 };
 
 // ─── RESULT CARD ──────────────────────────────────────────────────────────────
-function ResultCard({ result, onChangCity, lang, email, onRateSubmit }: {
-  result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; onRateSubmit:(d:"today"|"tomorrow",r:number)=>void;
+function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChange }: {
+  result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; onRateSubmit:(d:"today"|"tomorrow",r:number)=>void; onSkyChange:(sky:SkyTheme)=>void;
 }) {
   const t=TR[lang];
   const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("today");
@@ -366,6 +366,8 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit }: {
   const feel=activeDay==="today"?result.todayFeel:result.tomorrowFeel;
   const dateStr=activeDay==="today"?result.todayDateStr:result.tomorrowDateStr;
   const sky=getSkyTheme(feel);
+
+  useEffect(()=>{ onSkyChange(sky); },[feel]);
   const clothing=getClothingItems(feel);
 
   async function submitRating(v:number) {
@@ -548,6 +550,7 @@ export default function App() {
   const [locLoading,setLocLoading]=useState(false);
   const [sideMenuOpen,setSideMenuOpen]=useState(false);
   const [changingCity,setChangingCity]=useState(false);
+  const [activeSky,setActiveSky]=useState<SkyTheme>(getSkyTheme(20));
 
   const setF=(k:string)=>(v:string)=>{setForm(f=>({...f,[k]:v}));setErrors(e=>({...e,[k]:""}));setGlobalError("");};
 
@@ -634,8 +637,10 @@ export default function App() {
       const now=new Date(); const tom=new Date(); tom.setDate(tom.getDate()+1);
       const loc=lang==="he"?"he-IL":"en-US";
       const opts:Intl.DateTimeFormatOptions={weekday:"long",day:"numeric",month:"long"};
+      const todayFeel=weather.today.avg+offset;
+      setActiveSky(getSkyTheme(todayFeel));
       setResult({ today:{...weather.today}, tomorrow:{...weather.tomorrow}, cityHe:weather.cityHe,
-        todayFeel:weather.today.avg+offset, tomorrowFeel:weather.tomorrow.avg+offset,
+        todayFeel, tomorrowFeel:weather.tomorrow.avg+offset,
         todayDateStr:now.toLocaleDateString(loc,opts), tomorrowDateStr:tom.toLocaleDateString(loc,opts) });
     }catch(e:unknown){setGlobalError(e instanceof Error?e.message:t.weatherError);}
     finally{setLoading(false);setLoadingMsg("");}
@@ -664,7 +669,8 @@ export default function App() {
 
   return (
     <div dir={isRtl?"rtl":"ltr"} style={{ minHeight:"100vh", fontFamily:"'Heebo', sans-serif",
-      background:"linear-gradient(145deg, #1a3560 0%, #2a52a0 55%, #162c52 100%)",
+      background:`linear-gradient(180deg, ${activeSky.sky1} 0%, ${activeSky.sky2} 55%, ${activeSky.sky3} 100%)`,
+      transition:"background 1.5s ease",
       display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px 56px" }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -802,7 +808,7 @@ export default function App() {
         {/* ── WEATHER ── */}
         {view==="weather"&&profile&&(
           result ? (
-            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);}} lang={lang} email={email} onRateSubmit={()=>{}}/>
+            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);setActiveSky(getSkyTheme(20));}} lang={lang} email={email} onRateSubmit={()=>{}} onSkyChange={setActiveSky}/>
           ) : loading ? LoadingCard
           : changingCity ? (
             <Card>
