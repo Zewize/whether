@@ -92,7 +92,7 @@ export async function saveOTP(email: string, code: string) {
 export async function verifyOTP(email: string, code: string): Promise<boolean> {
   const wb = await loadWorkbook();
   const data = XLSX.utils.sheet_to_json<{ email: string; code: string; expires_at: string }>(wb.Sheets["otps"]);
-  const row = data.find(r => r.email === email && r.code === code);
+  const row = data.find(r => r.email === email && String(r.code) === String(code));
   return !!row && new Date(row.expires_at) > new Date();
 }
 
