@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "ThermoWear – מה ללבוש מחר?",
+  title: "What2wear – מה ללבוש מחר?",
   description: "המלצת לבוש אישית לפי מזג האוויר והפיזיולוגיה שלך",
 };
 

@@ -6,7 +6,7 @@ import type { UserProfile } from "@/lib/excel-db";
 type Lang = "he" | "en";
 const TR = {
   he: {
-    appName:"ThermoWear", tagline:"המלצת לבוש אישית לפי מזג האוויר",
+    appName:"What2wear", tagline:"המלצת לבוש אישית לפי מזג האוויר",
     whatToWear:"מה ללבוש?", enterOtp:"הזן קוד אימות", register:"ספר לנו קצת עליך",
     hello:(n:string)=>`שלום ${n} 👋`,
     emailLabel:"כתובת מייל", emailPlaceholder:"you@example.com", invalidEmail:"מייל לא תקין",
@@ -46,7 +46,7 @@ const TR = {
     recLabels:{ hot:"חם מאוד", warm:"חמים ונעים", pleasant:"נעים", cool:"קריר", chilly:"קר מעט", cold:"קר" },
   },
   en: {
-    appName:"ThermoWear", tagline:"Personal clothing recommendation by weather",
+    appName:"What2wear", tagline:"Personal clothing recommendation by weather",
     whatToWear:"What to wear?", enterOtp:"Enter verification code", register:"Tell us about yourself",
     hello:(n:string)=>`Hello ${n} 👋`,
     emailLabel:"Email address", emailPlaceholder:"you@example.com", invalidEmail:"Invalid email",
@@ -122,7 +122,7 @@ function getClothingItems(feelTemp: number): ClothingItems {
 
 // ─── GEOLOCATION ──────────────────────────────────────────────────────────────
 async function getCityFromCoords(lat: number, lon: number): Promise<string> {
-  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=he`, { headers:{"User-Agent":"ThermoWear/1.0"} });
+  const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=he`, { headers:{"User-Agent":"What2wear/1.0"} });
   const data = await res.json();
   return data.address?.city||data.address?.town||data.address?.village||data.address?.county||"";
 }
@@ -621,7 +621,7 @@ export default function App() {
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:12}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"7px 20px",background:"rgba(255,255,255,0.08)",backdropFilter:"blur(12px)",borderRadius:40,border:"1px solid rgba(255,255,255,0.12)"}}>
               <span>🌡️</span>
-              <span style={{fontSize:12,fontWeight:800,letterSpacing:"0.14em",color:"rgba(255,255,255,0.8)",textTransform:"uppercase"}}>ThermoWear</span>
+              <span style={{fontSize:12,fontWeight:800,letterSpacing:"0.14em",color:"rgba(255,255,255,0.8)",textTransform:"uppercase"}}>What2wear</span>
             </div>
             {/* Lang toggle */}
             <div style={{display:"flex",background:"rgba(255,255,255,0.08)",borderRadius:30,padding:3,gap:2}}>
