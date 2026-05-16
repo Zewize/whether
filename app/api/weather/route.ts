@@ -10,8 +10,8 @@ function uvLevel(index: number): UVLevel {
 }
 
 function windLevel(kmh: number): WindLevel {
-  if (kmh <= 20) return "low";
-  if (kmh <= 40) return "medium";
+  if (kmh <= 10) return "low";
+  if (kmh <= 20) return "medium";
   return "high";
 }
 

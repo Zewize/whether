@@ -122,6 +122,32 @@ function getClothingItems(feel: number): ClothingItems {
   };
 }
 
+function getRecommendationText(feel: number, uv: "low"|"medium"|"high", wind: "low"|"medium"|"high", lang: Lang): string {
+  const parts: string[] = [];
+  if (lang === "he") {
+    if (uv === "high") parts.push(feel >= 20 ? "בשמש חם מאוד – מומלץ להישאר בצל ולמרוח קרם הגנה" : "קרינת UV גבוהה – מומלץ קרם הגנה");
+    else if (uv === "medium" && feel >= 16) parts.push("בשמש תרגיש חום, בצל יהיה נעים יותר");
+    if (wind === "high") parts.push("רוח חזקה – תרגיש קריר יותר מהטמפרטורה בפועל");
+    else if (wind === "medium") parts.push("רוח בינונית – עדיף לקחת שכבה קלה");
+    if (!parts.length) {
+      if (feel >= 28) parts.push("יום חם – שתה הרבה מים");
+      else if (feel <= 5) parts.push("קור עז – התלבש בשכבות");
+      else if (feel >= 18 && uv === "low" && wind === "low") parts.push("מזג אוויר נעים, מתאים לפעילות בחוץ");
+    }
+  } else {
+    if (uv === "high") parts.push(feel >= 20 ? "Very strong sun – seek shade and apply sunscreen" : "High UV – apply sunscreen");
+    else if (uv === "medium" && feel >= 16) parts.push("Sun feels warm; shade is noticeably cooler");
+    if (wind === "high") parts.push("Strong wind – will feel colder than the actual temperature");
+    else if (wind === "medium") parts.push("Moderate breeze – consider a light layer");
+    if (!parts.length) {
+      if (feel >= 28) parts.push("Hot day – stay hydrated");
+      else if (feel <= 5) parts.push("Very cold – dress in layers");
+      else if (feel >= 18 && uv === "low" && wind === "low") parts.push("Pleasant weather – great for outdoor activities");
+    }
+  }
+  return parts.join(" · ");
+}
+
 // ─── GEOLOCATION ──────────────────────────────────────────────────────────────
 async function getCityFromCoords(lat: number, lon: number): Promise<string> {
   const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=he`, { headers:{"User-Agent":"What2wear/1.0"} });
@@ -416,10 +442,18 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
 
       {/* Details card */}
       <Card style={{ marginBottom:8 }}>
-        <div style={{ display:"flex", gap:8, marginBottom:18, flexWrap:"wrap" as const }}>
+        <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" as const }}>
           <LevelBadge label={t.uvIndex} level={dayData.uv} lang={lang}/>
           <LevelBadge label={t.wind} level={dayData.wind} lang={lang}/>
         </div>
+        {(() => {
+          const rec = getRecommendationText(feel, dayData.uv, dayData.wind, lang);
+          return rec ? (
+            <div style={{ fontSize:13, color:C.textSec, lineHeight:1.7, padding:"10px 12px", background:"rgba(30,58,110,0.05)", borderRadius:10, marginBottom:16, borderRight:`3px solid rgba(30,58,110,0.25)` }}>
+              {rec}
+            </div>
+          ) : null;
+        })()}
         <SectionHead text={t.clothingRec}/>
         <ClothingDisplay items={clothing} lang={lang}/>
       </Card>
@@ -458,8 +492,38 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
 }
 
 // ─── PROFILE DRAWER ───────────────────────────────────────────────────────────
+type AdminStats = { userCount:number; ratingCount:number; avgRating:number; tokenCostNis:number };
+
+function AdminPanel() {
+  const [stats,setStats]=useState<AdminStats|null>(null);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    fetch("/api/admin/stats").then(r=>r.json()).then(d=>setStats(d)).finally(()=>setLoading(false));
+  },[]);
+  const row=(label:string,value:string)=>(
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:`1px solid rgba(0,0,0,0.06)` }}>
+      <span style={{ fontSize:12, color:"#64748b" }}>{label}</span>
+      <span style={{ fontSize:14, fontWeight:700, color:"#1e293b" }}>{value}</span>
+    </div>
+  );
+  return (
+    <div style={{ marginTop:24 }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#94a3b8", marginBottom:12 }}>🛡 Admin Dashboard</div>
+      {loading ? <div style={{ fontSize:12, color:"#94a3b8", textAlign:"center", padding:"16px 0" }}>טוען...</div> : stats ? (
+        <div style={{ background:"#f8fafc", borderRadius:12, padding:"4px 14px", border:"1px solid rgba(0,0,0,0.06)" }}>
+          {row("משתמשים רשומים", String(stats.userCount))}
+          {row("דירוגים שנשמרו", String(stats.ratingCount))}
+          {row("ממוצע דירוג", stats.ratingCount ? `${stats.avgRating} / 5 ★` : "אין עדיין")}
+          {row("עלות AI (₪)", "₪0 — לא נעשה שימוש ב-AI")}
+        </div>
+      ) : <div style={{ fontSize:12, color:"#ef4444" }}>שגיאה בטעינה</div>}
+    </div>
+  );
+}
+
 function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfile; lang:Lang; onClose:()=>void; onSaved:(p:UserProfile)=>void }) {
   const t=TR[lang];
+  const isAdmin=profile.email==="ofek@zewize.com";
   const [editing,setEditing]=useState(false);
   const [form,setForm]=useState({ name:profile.name, phone:profile.phone, city:profile.city, height:profile.height, weight:profile.weight });
   const [saving,setSaving]=useState(false);
@@ -501,6 +565,7 @@ function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfil
             <button onClick={()=>setEditing(true)} style={{ width:"100%", marginTop:20, padding:"12px", background:"#1e3a6e", border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
               {t.editProfile}
             </button>
+            {isAdmin && <AdminPanel/>}
           </div>
         ) : (
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>

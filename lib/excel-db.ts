@@ -53,6 +53,17 @@ async function saveWorkbook(wb: XLSX.WorkBook) {
   await put(BLOB_NAME, buf, { access: "private", allowOverwrite: true });
 }
 
+export async function getAllUsers(): Promise<UserProfile[]> {
+  const wb = await loadWorkbook();
+  return XLSX.utils.sheet_to_json<UserProfile>(wb.Sheets["users"]);
+}
+
+export async function getAllRatings(): Promise<RatingEntry[]> {
+  const wb = await loadWorkbook();
+  if (!wb.Sheets["ratings"]) return [];
+  return XLSX.utils.sheet_to_json<RatingEntry>(wb.Sheets["ratings"]);
+}
+
 export async function getUserByEmail(email: string): Promise<UserProfile | null> {
   const wb = await loadWorkbook();
   const data = XLSX.utils.sheet_to_json<UserProfile>(wb.Sheets["users"]);
