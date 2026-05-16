@@ -74,9 +74,10 @@ export async function getUserByEmail(email: string): Promise<UserProfile | null>
 
 export async function saveUser(user: UserProfile) {
   const wb = await loadWorkbook();
-  const data = XLSX.utils.sheet_to_json<UserProfile>(wb.Sheets["users"]);
+  const data = XLSX.utils.sheet_to_json<UserProfile & { created_at?: string }>(wb.Sheets["users"]);
   const idx = data.findIndex(r => r.email === user.email);
-  if (idx === -1) data.push(user); else data[idx] = user;
+  if (idx === -1) data.push({ ...user, created_at: new Date().toISOString() });
+  else data[idx] = { ...data[idx], ...user };
   wb.Sheets["users"] = XLSX.utils.json_to_sheet(data);
   await saveWorkbook(wb);
 }
