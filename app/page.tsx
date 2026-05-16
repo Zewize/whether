@@ -30,7 +30,7 @@ const TR = {
     clothingRec:"המלצת לבוש", uvIndex:"UV", wind:"רוח",
     low:"נמוך", medium:"בינוני", high:"גבוה",
     pants:"מכנסיים", pantsShort:"קצרים", pantsLong:"ארוכים",
-    shoes:"נעליים", shoesOpen:"פתוחות", shoesClosed:"סגורות",
+    shoes:"נעליים", shoesSandals:"סנדלים", shoesFlip:"כפכפים", shoesClosed:"סגורות",
     shirt:"חולצה", shirtShort:"קצרה", shirtLong:"ארוכה",
     outerLight:"עליונית דקה", outerCoat:"מעיל",
     accessories:"כובע וכפפות",
@@ -70,7 +70,7 @@ const TR = {
     clothingRec:"Clothing", uvIndex:"UV", wind:"Wind",
     low:"Low", medium:"Med", high:"High",
     pants:"Pants", pantsShort:"Short", pantsLong:"Long",
-    shoes:"Shoes", shoesOpen:"Open", shoesClosed:"Closed",
+    shoes:"Shoes", shoesSandals:"Sandals", shoesFlip:"Flip-flops", shoesClosed:"Closed",
     shirt:"Shirt", shirtShort:"Short sleeve", shirtLong:"Long sleeve",
     outerLight:"Light jacket", outerCoat:"Coat",
     accessories:"Hat & gloves",
@@ -113,10 +113,11 @@ function getConditionLabel(feel: number, lang: Lang): string {
   if (feel>=28) return L.hot; if (feel>=22) return L.warm; if (feel>=16) return L.pleasant;
   if (feel>=10) return L.cool; if (feel>=5) return L.chilly; return L.cold;
 }
-type ClothingItems = { pants:"long"|"short"; shoes:"closed"|"open"; shirt:"long"|"short"; outer:"coat"|"light"|null; accessories:boolean };
+type ClothingItems = { pants:"long"|"short"; shoes:"closed"|"sandals"|"flip"; shirt:"long"|"short"; outer:"coat"|"light"|null; accessories:boolean };
 function getClothingItems(feel: number): ClothingItems {
   return {
-    pants: feel>=24?"short":"long", shoes: feel>=26?"open":"closed",
+    pants: feel>=24?"short":"long",
+    shoes: feel>=28?"flip":feel>=24?"sandals":"closed",
     shirt: feel>=22?"short":"long", outer: feel>=22?null:feel>=14?"light":"coat",
     accessories: feel<=8,
   };
@@ -333,7 +334,7 @@ function ClothingDisplay({ items, lang }: { items:ClothingItems; lang:Lang }) {
   return (
     <div>
       <ClothingRow label={t.pants} value={items.pants==="short"?t.pantsShort:t.pantsLong}/>
-      <ClothingRow label={t.shoes} value={items.shoes==="open"?t.shoesOpen:t.shoesClosed}/>
+      <ClothingRow label={t.shoes} value={items.shoes==="flip"?t.shoesFlip:items.shoes==="sandals"?t.shoesSandals:t.shoesClosed}/>
       <ClothingRow label={t.shirt} value={items.shirt==="short"?t.shirtShort:t.shirtLong}/>
       {items.outer&&<ClothingRow label={items.outer==="coat"?t.outerCoat:t.outerLight}/>}
       {items.accessories&&<ClothingRow label={t.accessories}/>}
@@ -372,7 +373,7 @@ function StarRating({ value, onChange, saved }: { value:number; onChange:(v:numb
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type DayWeather = { min:number; max:number; avg:number; uv:"low"|"medium"|"high"; wind:"low"|"medium"|"high" };
-type HourData = { localHour:number; temp:number; code:number; isDay:boolean };
+type HourData = { localHour:number; temp:number; code:number; isDay:boolean; uv:"low"|"medium"|"high"; wind:"low"|"medium"|"high" };
 type WeatherResult = {
   today:DayWeather; tomorrow:DayWeather; cityHe:string;
   todayFeel:number; tomorrowFeel:number;
@@ -478,8 +479,7 @@ function ClothingStripIcon({ feel }: { feel: number }) {
 }
 
 // ─── HOURLY STRIP ─────────────────────────────────────────────────────────────
-function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourData[]; feelOffset:number; lang:Lang; currentHour:number }) {
-  const [selHour,setSelHour]=useState(currentHour);
+function HourlyStrip({ hourly, feelOffset, lang, currentHour, selHour, onHourSelect }: { hourly:HourData[]; feelOffset:number; lang:Lang; currentHour:number; selHour:number; onHourSelect:(h:number)=>void }) {
   const ref=useRef<HTMLDivElement>(null);
   useEffect(()=>{
     if(ref.current){
@@ -492,6 +492,7 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourDat
   const selFeel=(selData?.temp||0)+feelOffset;
   const selClothing=getClothingItems(selFeel);
   const t=TR[lang];
+  const displayHour=selData?.localHour??selHour;
 
   return (
     <div style={{ background:C.card, borderRadius:16, overflow:"hidden", boxShadow:"0 4px 24px rgba(0,0,0,0.1)", marginBottom:8 }}>
@@ -504,7 +505,7 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourDat
         {hourly.map((h,i)=>{
           const isSel=h.localHour===selHour;
           return (
-            <div key={i} onClick={()=>setSelHour(h.localHour)}
+            <div key={i} onClick={()=>onHourSelect(h.localHour)}
               style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:5, padding:"10px 10px", borderRadius:12, minWidth:62, flexShrink:0, cursor:"pointer",
                 background:isSel?"rgba(30,58,110,0.1)":"transparent",
                 borderBottom:isSel?"2.5px solid #1e3a6e":"2.5px solid transparent",
@@ -524,14 +525,14 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourDat
       {selData && (
         <div style={{ borderTop:`1px solid ${C.border}`, padding:"12px 16px" }}>
           <div style={{ fontSize:11, color:C.textMuted, marginBottom:10, display:"flex", alignItems:"center", gap:6, direction:"ltr" }}>
-            <span style={{ fontWeight:700, color:"#1e3a6e", fontSize:13 }}>{String(selHour).padStart(2,"0")}:00</span>
+            <span style={{ fontWeight:700, color:"#1e3a6e", fontSize:13 }}>{String(displayHour).padStart(2,"0")}:00</span>
             <span>·</span>
             <span>{lang==="he"?"תחושה":"Feel"} {selFeel}°</span>
           </div>
           <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6 }}>
             {[
               `${t.pants}: ${selClothing.pants==="short"?t.pantsShort:t.pantsLong}`,
-              `${t.shoes}: ${selClothing.shoes==="open"?t.shoesOpen:t.shoesClosed}`,
+              `${t.shoes}: ${selClothing.shoes==="flip"?t.shoesFlip:selClothing.shoes==="sandals"?t.shoesSandals:t.shoesClosed}`,
               `${t.shirt}: ${selClothing.shirt==="short"?t.shirtShort:t.shirtLong}`,
               ...(selClothing.outer?[selClothing.outer==="coat"?t.outerCoat:t.outerLight]:[]),
               ...(selClothing.accessories?[t.accessories]:[]),
@@ -553,6 +554,7 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
 }) {
   const t=TR[lang];
   const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("today");
+  const [selHour,setSelHour]=useState(new Date().getHours());
   const [ratings,setRatings]=useState<{today?:number;tomorrow?:number}>({});
   const [rateSaved,setRateSaved]=useState<{today?:boolean;tomorrow?:boolean}>({});
   const [ratingDir,setRatingDir]=useState<{today?:string;tomorrow?:string}>({});
@@ -617,24 +619,30 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
         const hourly = activeDay==="today" ? result.todayHourly : result.tomorrowHourly;
         if (!hourly?.length) return null;
         const currentHour = activeDay==="today" ? new Date().getHours() : 0;
-        return <HourlyStrip hourly={hourly} feelOffset={result.feelOffset} lang={lang} currentHour={currentHour}/>;
+        return <HourlyStrip hourly={hourly} feelOffset={result.feelOffset} lang={lang} currentHour={currentHour} selHour={selHour} onHourSelect={setSelHour}/>;
       })()}
 
-      {/* Details card */}
-      <Card style={{ marginBottom:8 }}>
-        <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" as const }}>
-          <LevelBadge label={t.uvIndex} level={dayData.uv} lang={lang}/>
-          <LevelBadge label={t.wind} level={dayData.wind} lang={lang}/>
-        </div>
-        {(() => {
-          const rec = getRecommendationText(feel, dayData.uv, dayData.wind, lang);
-          return rec ? (
-            <div style={{ fontSize:13, color:C.textSec, lineHeight:1.7, padding:"10px 12px", background:"rgba(30,58,110,0.05)", borderRadius:10, marginBottom:16, borderRight:`3px solid rgba(30,58,110,0.25)` }}>
-              {rec}
+      {/* Details card — UV/wind/rec use selected hourly data when available */}
+      {(() => {
+        const hourly = activeDay==="today"?result.todayHourly:result.tomorrowHourly;
+        const hData = hourly?.find(h=>h.localHour===selHour) || null;
+        const uvLevel = hData ? hData.uv : dayData.uv;
+        const windLevel = hData ? hData.wind : dayData.wind;
+        const rec = getRecommendationText(feel, uvLevel, windLevel, lang);
+        return (
+          <Card style={{ marginBottom:8 }}>
+            <div style={{ display:"flex", gap:8, marginBottom:rec?14:0, flexWrap:"wrap" as const }}>
+              <LevelBadge label={t.uvIndex} level={uvLevel} lang={lang}/>
+              <LevelBadge label={t.wind} level={windLevel} lang={lang}/>
             </div>
-          ) : null;
-        })()}
-      </Card>
+            {rec && (
+              <div style={{ fontSize:13, color:C.textSec, lineHeight:1.7, padding:"10px 12px", background:"rgba(30,58,110,0.05)", borderRadius:10, borderRight:`3px solid rgba(30,58,110,0.25)` }}>
+                {rec}
+              </div>
+            )}
+          </Card>
+        );
+      })()}
 
       {/* Rating card */}
       <Card style={{ marginBottom:8 }}>

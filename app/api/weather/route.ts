@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const weatherRes = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
     `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,wind_speed_10m_max` +
-    `&hourly=temperature_2m,weather_code,is_day` +
+    `&hourly=temperature_2m,weather_code,is_day,uv_index,wind_speed_10m` +
     `&timezone=auto&forecast_days=2`,
     { headers: { "User-Agent": "What2wear/1.0" } }
   );
@@ -52,12 +52,18 @@ export async function POST(req: NextRequest) {
   });
 
   const makeHourly = (dayIdx: number) =>
-    Array.from({ length: 24 }, (_, i) => ({
-      localHour: i,
-      temp: Math.round(h.temperature_2m[dayIdx * 24 + i] ?? 0),
-      code: h.weather_code[dayIdx * 24 + i] ?? 0,
-      isDay: h.is_day[dayIdx * 24 + i] === 1,
-    }));
+    Array.from({ length: 24 }, (_, i) => {
+      const idx = dayIdx * 24 + i;
+      const isDay = h.is_day[idx] === 1;
+      return {
+        localHour: i,
+        temp: Math.round(h.temperature_2m[idx] ?? 0),
+        code: h.weather_code[idx] ?? 0,
+        isDay,
+        uv: isDay ? uvLevel(h.uv_index[idx] ?? 0) : "low" as const,
+        wind: windLevel(h.wind_speed_10m[idx] ?? 0),
+      };
+    });
 
   return NextResponse.json({
     today: makeDay(0),
