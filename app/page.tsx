@@ -498,18 +498,18 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour }: { hourly:HourDat
       {/* Scrollable strip */}
       <div ref={ref} dir="ltr" style={{ overflowX:"auto", display:"flex", padding:"10px 6px 8px", scrollbarWidth:"none" as const }}>
         {hourly.map((h,i)=>{
-          const feel=h.temp+feelOffset;
           const isSel=h.localHour===selHour;
           return (
-            <div key={i} onClick={()=>setSelHour(h.localHour)} onMouseEnter={()=>setSelHour(h.localHour)}
-              style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:4, padding:"8px 8px", borderRadius:12, minWidth:60, flexShrink:0, cursor:"pointer",
-                background:isSel?"rgba(30,58,110,0.08)":"transparent", transition:"background .15s" }}>
+            <div key={i} onClick={()=>setSelHour(h.localHour)}
+              style={{ display:"flex", flexDirection:"column" as const, alignItems:"center", gap:5, padding:"10px 10px", borderRadius:12, minWidth:62, flexShrink:0, cursor:"pointer",
+                background:isSel?"rgba(30,58,110,0.1)":"transparent",
+                borderBottom:isSel?"2.5px solid #1e3a6e":"2.5px solid transparent",
+                transition:"all .15s" }}>
               <div style={{ fontSize:10, fontWeight:isSel?700:500, color:isSel?"#1e3a6e":"#64748b" }}>
                 {String(h.localHour).padStart(2,"0")}:00
               </div>
-              <WeatherIcon code={h.code} isDay={h.isDay} size={22}/>
-              <div style={{ fontSize:12, fontWeight:700, color:"#1e293b" }}>{h.temp}°</div>
-              <ClothingStripIcon feel={feel}/>
+              <WeatherIcon code={h.code} isDay={h.isDay} size={24}/>
+              <div style={{ fontSize:13, fontWeight:700, color:isSel?"#1e3a6e":"#1e293b" }}>{h.temp}°</div>
             </div>
           );
         })}
