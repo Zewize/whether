@@ -123,27 +123,34 @@ function getClothingItems(feel: number): ClothingItems {
   };
 }
 
-function getRecommendationText(feel: number, uv: "low"|"medium"|"high", wind: "low"|"medium"|"high", lang: Lang): string {
+function getRecommendationText(feel: number, uv: "low"|"medium"|"high", wind: "low"|"medium"|"high", lang: Lang, gender?: string, weatherCode?: number): string {
   const parts: string[] = [];
+  const fem = gender === "female";
+  const isRainy = weatherCode !== undefined && weatherCode >= 51;
+  const isSunny = weatherCode !== undefined && weatherCode <= 2;
   if (lang === "he") {
-    if (uv === "high") parts.push(feel >= 20 ? "בשמש חם מאוד – מומלץ להישאר בצל ולמרוח קרם הגנה" : "קרינת UV גבוהה – מומלץ קרם הגנה");
-    else if (uv === "medium" && feel >= 16) parts.push("בשמש תרגיש חום, בצל יהיה נעים יותר");
-    if (wind === "high") parts.push("רוח חזקה – תרגיש קריר יותר מהטמפרטורה בפועל");
+    if (isSunny && uv !== "low") parts.push(fem ? "אל תשכחי משקפי שמש" : "אל תשכח משקפי שמש");
+    if (isRainy) parts.push(fem ? "כדאי לקחת מטרייה" : "כדאי לקחת מטרייה");
+    if (uv === "high" && !isRainy) parts.push(feel >= 20 ? "בשמש חם מאוד – מומלץ להישאר בצל ולמרוח קרם הגנה" : "קרינת UV גבוהה – מומלץ קרם הגנה");
+    else if (uv === "medium" && feel >= 16 && !isRainy) parts.push(fem ? "בשמש תרגישי חום, בצל יהיה נעים יותר" : "בשמש תרגיש חום, בצל יהיה נעים יותר");
+    if (wind === "high") parts.push(fem ? "רוח חזקה – תרגישי קריר יותר מהטמפרטורה בפועל" : "רוח חזקה – תרגיש קריר יותר מהטמפרטורה בפועל");
     else if (wind === "medium") parts.push("רוח בינונית – עדיף לקחת שכבה קלה");
     if (!parts.length) {
-      if (feel >= 28) parts.push("יום חם – שתה הרבה מים");
-      else if (feel <= 5) parts.push("קור עז – התלבש בשכבות");
-      else if (feel >= 18 && uv === "low" && wind === "low") parts.push("מזג אוויר נעים, מתאים לפעילות בחוץ");
+      if (feel >= 28) parts.push(fem ? "יום חם – שתי הרבה מים" : "יום חם – שתה הרבה מים");
+      else if (feel <= 5) parts.push(fem ? "קור עז – התלבשי בשכבות" : "קור עז – התלבש בשכבות");
+      else if (feel >= 16) parts.push("מזג אוויר נעים, מתאים לפעילות בחוץ");
     }
   } else {
-    if (uv === "high") parts.push(feel >= 20 ? "Very strong sun – seek shade and apply sunscreen" : "High UV – apply sunscreen");
-    else if (uv === "medium" && feel >= 16) parts.push("Sun feels warm; shade is noticeably cooler");
+    if (isSunny && uv !== "low") parts.push("Don't forget your sunglasses");
+    if (isRainy) parts.push("Take an umbrella");
+    if (uv === "high" && !isRainy) parts.push(feel >= 20 ? "Very strong sun – seek shade and apply sunscreen" : "High UV – apply sunscreen");
+    else if (uv === "medium" && feel >= 16 && !isRainy) parts.push("Sun feels warm; shade is noticeably cooler");
     if (wind === "high") parts.push("Strong wind – will feel colder than the actual temperature");
     else if (wind === "medium") parts.push("Moderate breeze – consider a light layer");
     if (!parts.length) {
       if (feel >= 28) parts.push("Hot day – stay hydrated");
       else if (feel <= 5) parts.push("Very cold – dress in layers");
-      else if (feel >= 18 && uv === "low" && wind === "low") parts.push("Pleasant weather – great for outdoor activities");
+      else if (feel >= 16) parts.push("Pleasant weather – great for outdoor activities");
     }
   }
   return parts.join(" · ");
@@ -549,8 +556,8 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour, selHour, onHourSel
 }
 
 // ─── RESULT CARD ──────────────────────────────────────────────────────────────
-function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChange }: {
-  result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; onRateSubmit:(d:"today"|"tomorrow",r:number)=>void; onSkyChange:(sky:SkyTheme)=>void;
+function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, onSkyChange }: {
+  result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; gender?:string; onRateSubmit:(d:"today"|"tomorrow",r:number)=>void; onSkyChange:(sky:SkyTheme)=>void;
 }) {
   const t=TR[lang];
   const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("today");
@@ -628,7 +635,8 @@ function ResultCard({ result, onChangCity, lang, email, onRateSubmit, onSkyChang
         const hData = hourly?.find(h=>h.localHour===selHour) || null;
         const uvLevel = hData ? hData.uv : dayData.uv;
         const windLevel = hData ? hData.wind : dayData.wind;
-        const rec = getRecommendationText(feel, uvLevel, windLevel, lang);
+        const hourFeel = hData ? Math.round(hData.temp + result.feelOffset) : feel;
+        const rec = getRecommendationText(hourFeel, uvLevel, windLevel, lang, gender, hData?.code);
         return (
           <Card style={{ marginBottom:8 }}>
             <div style={{ display:"flex", gap:8, marginBottom:rec?14:0, flexWrap:"wrap" as const }}>
@@ -683,9 +691,11 @@ type AdminStats = { userCount:number; ratingCount:number; avgRating:number; toke
 function AdminPanel() {
   const [stats,setStats]=useState<AdminStats|null>(null);
   const [loading,setLoading]=useState(true);
-  useEffect(()=>{
-    fetch("/api/admin/stats").then(r=>r.json()).then(d=>setStats(d)).finally(()=>setLoading(false));
-  },[]);
+  function load(){
+    setLoading(true);
+    fetch("/api/admin/stats",{cache:"no-store"}).then(r=>r.json()).then(d=>setStats(d)).catch(()=>setStats(null)).finally(()=>setLoading(false));
+  }
+  useEffect(()=>{ load(); },[]);
 
   const kpi=(value:string,label:string,sub:string,accent:string,bg:string)=>(
     <div style={{ background:bg, borderRadius:14, padding:"14px 16px", border:`1px solid ${accent}22`, position:"relative" as const, overflow:"hidden" as const }}>
@@ -700,9 +710,14 @@ function AdminPanel() {
 
   return (
     <div style={{ marginTop:24 }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
-        <div style={{ width:3, height:16, borderRadius:2, background:"#1e3a6e" }}/>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#64748b" }}>KPI Dashboard</div>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ width:3, height:16, borderRadius:2, background:"#1e3a6e" }}/>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase" as const, color:"#64748b" }}>KPI Dashboard</div>
+        </div>
+        <button onClick={load} disabled={loading} style={{ background:"none", border:"1px solid #e2e8f0", borderRadius:8, padding:"4px 10px", fontSize:11, color:"#64748b", cursor:"pointer", fontFamily:"inherit" }}>
+          {loading ? "..." : "רענן"}
+        </button>
       </div>
 
       {loading ? (
@@ -1091,7 +1106,7 @@ export default function App() {
         {/* ── WEATHER ── */}
         {view==="weather"&&profile&&(
           result ? (
-            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);setActiveSky(getSkyTheme(20));}} lang={lang} email={email} onRateSubmit={()=>{}} onSkyChange={setActiveSky}/>
+            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);setActiveSky(getSkyTheme(20));}} lang={lang} email={email} gender={profile.gender} onRateSubmit={()=>{}} onSkyChange={setActiveSky}/>
           ) : loading ? LoadingCard
           : changingCity ? (
             <Card>

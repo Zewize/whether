@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllUsers, getAllRatings } from "@/lib/excel-db";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
