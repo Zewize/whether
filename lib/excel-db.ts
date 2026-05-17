@@ -119,7 +119,7 @@ export async function getRatingCorrection(email: string): Promise<number> {
   const wb = await loadWorkbook();
   if (!wb.Sheets["ratings"]) return 0;
   const data = XLSX.utils.sheet_to_json<RatingEntry>(wb.Sheets["ratings"]);
-  const withDir = data.filter(r => r.email === email && (r.direction === "too_hot" || r.direction === "too_cold")).slice(-10);
+  const withDir = data.filter(r => r.email === email && (r.direction === "too_hot" || r.direction === "too_cold")).slice(-3);
   if (!withDir.length) return 0;
   const sum = withDir.reduce((acc, r) => acc + (r.direction === "too_hot" ? 1 : -1), 0);
   return Math.max(-3, Math.min(3, Math.round(sum / withDir.length * 2)));

@@ -387,7 +387,6 @@ type WeatherResult = {
   todayDateStr:string; tomorrowDateStr:string;
   todayHourly:HourData[]; tomorrowHourly:HourData[];
   feelOffset:number;
-  todayRec:string; tomorrowRec:string;
 };
 
 // ─── WEATHER SVG ICONS ────────────────────────────────────────────────────────
@@ -636,17 +635,17 @@ function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, on
         const hData = hourly?.find(h=>h.localHour===selHour) || null;
         const uvLevel = hData ? hData.uv : dayData.uv;
         const windLevel = hData ? hData.wind : dayData.wind;
-        const aiRec = activeDay==="today" ? result.todayRec : result.tomorrowRec;
+        const hourFeel = hData ? Math.round(hData.temp + result.feelOffset) : feel;
+        const rec = getRecommendationText(hourFeel, uvLevel, windLevel, lang, gender, hData?.code);
         return (
           <Card style={{ marginBottom:8 }}>
-            <div style={{ display:"flex", gap:8, marginBottom:aiRec?14:0, flexWrap:"wrap" as const }}>
+            <div style={{ display:"flex", gap:8, marginBottom:rec?14:0, flexWrap:"wrap" as const }}>
               <LevelBadge label={t.uvIndex} level={uvLevel} lang={lang}/>
               <LevelBadge label={t.wind} level={windLevel} lang={lang}/>
             </div>
-            {aiRec && (
-              <div style={{ fontSize:13, color:C.textSec, lineHeight:1.7, padding:"10px 12px", background:"rgba(30,58,110,0.05)", borderRadius:10, borderRight:`3px solid rgba(30,58,110,0.25)`, display:"flex", gap:8, alignItems:"flex-start" }}>
-                <span style={{ fontSize:15, flexShrink:0 }}>✨</span>
-                <span>{aiRec}</span>
+            {rec && (
+              <div style={{ fontSize:13, color:C.textSec, lineHeight:1.7, padding:"10px 12px", background:"rgba(30,58,110,0.05)", borderRadius:10, borderRight:`3px solid rgba(30,58,110,0.25)` }}>
+                {rec}
               </div>
             )}
           </Card>
@@ -930,33 +929,17 @@ export default function App() {
       setLoadingMsg(t.calculating);
       const age=calcAge(p.birthdate); const bmi=calcBMI(+p.weight,+p.height);
       const{genderOffset,bmiOffset,ageOffset}=getOffsets(p.gender,bmi,age);
-      const correction=corrRes.correction||0;
-      const offset=genderOffset+bmiOffset+ageOffset+correction;
+      const offset=genderOffset+bmiOffset+ageOffset+(corrRes.correction||0);
       const now=new Date(); const tom=new Date(); tom.setDate(tom.getDate()+1);
       const loc=lang==="he"?"he-IL":"en-US";
       const opts:Intl.DateTimeFormatOptions={weekday:"long",day:"numeric",month:"long"};
       const todayFeel=weather.today.avg+offset;
-      const tomorrowFeel=weather.tomorrow.avg+offset;
       setActiveSky(getSkyTheme(todayFeel));
-
-      const recPayload=(feel:number,dayData:DayWeather)=>({
-        feel, uv:dayData.uv, wind:dayData.wind,
-        weatherCode: weather.todayHourly?.[new Date().getHours()]?.code ?? 0,
-        gender:p.gender, age, bmi:Math.round(bmi*10)/10,
-        correction, lang, city:weather.cityHe,
-      });
-      setLoadingMsg(lang==="he"?"מחשב המלצה אישית...":"Personalizing...");
-      const [todayRecRes,tomorrowRecRes]=await Promise.all([
-        fetch("/api/recommendation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(recPayload(todayFeel,weather.today))}).then(r=>r.json()).catch(()=>({text:""})),
-        fetch("/api/recommendation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(recPayload(tomorrowFeel,weather.tomorrow))}).then(r=>r.json()).catch(()=>({text:""})),
-      ]);
-
       setResult({ today:{...weather.today}, tomorrow:{...weather.tomorrow}, cityHe:weather.cityHe,
-        todayFeel, tomorrowFeel,
+        todayFeel, tomorrowFeel:weather.tomorrow.avg+offset,
         todayDateStr:now.toLocaleDateString(loc,opts), tomorrowDateStr:tom.toLocaleDateString(loc,opts),
         todayHourly:weather.todayHourly||[], tomorrowHourly:weather.tomorrowHourly||[],
-        feelOffset:offset,
-        todayRec:todayRecRes.text||"", tomorrowRec:tomorrowRecRes.text||"" });
+        feelOffset:offset });
     }catch(e:unknown){setGlobalError(e instanceof Error?e.message:t.weatherError);}
     finally{setLoading(false);setLoadingMsg("");}
   }
