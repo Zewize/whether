@@ -556,6 +556,60 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour, selHour, onHourSel
   );
 }
 
+// ─── ACTIVITY RECOMMENDATION ──────────────────────────────────────────────────
+function getActivityRec(activity:"office"|"outdoor"|"sports"|null, feel:number, lang:Lang, uv:"low"|"medium"|"high", gender?:string): string {
+  if (!activity) return "";
+  const fem = gender === "female";
+  const he = lang === "he";
+  const uvHe = uv==="high" ? " — קרם הגנה חובה" : uv==="medium" ? " — כדאי למרוח קרם הגנה" : "";
+  const uvEn = uv==="high" ? " — sunscreen is a must" : uv==="medium" ? " — apply sunscreen" : "";
+
+  if (activity === "sports") {
+    if (he) {
+      if (feel>=26) return `לספורט: חולצת אימון קצרה, מכנסי ריצה קצרים ונעלי ספורט — ${fem?"שתי":"שתה"} הרבה מים, חם מאוד בחוץ`;
+      if (feel>=20) return "לספורט: חולצת אימון קצרה, מכנסי ריצה ונעלי ספורט";
+      if (feel>=14) return `לספורט: חולצה ארוכה לאימון, מכנסי ריצה ונעלי ספורט — ז'קט דק לחימום לפני ואחרי`;
+      if (feel>=8)  return "לספורט: שכבה תחתונה חמה, מכנסי ריצה ארוכים, ז'קט ספורט ונעלי ספורט";
+      return `לספורט בקור: שכבה תחתונה, מכנסי ריצה ארוכים, ז'קט רוח ונעלי ספורט — ${fem?"התחממי":"התחמם"} היטב לפני`;
+    } else {
+      if (feel>=26) return "For sports: short training tee, running shorts and sneakers — drink plenty of water, it's hot";
+      if (feel>=20) return "For sports: short training tee, running shorts and sneakers";
+      if (feel>=14) return "For sports: long-sleeve training top, running pants and sneakers — light jacket for warm-up";
+      if (feel>=8)  return "For sports: thermal base layer, long running pants, sport jacket and sneakers";
+      return "For sports in the cold: base layer, long running pants, wind jacket and sneakers — warm up well first";
+    }
+  }
+
+  if (activity === "outdoor") {
+    if (he) {
+      if (feel>=26) return `לטיול: נעליים נוחות, בגדים קלים ומצנפת${uvHe}`;
+      if (feel>=18) return `לטיול: נעליים סגורות, לבוש קל-בינוני${uvHe}`;
+      if (feel>=10) return `לטיול: נעליים סגורות, שכבה אמצעית — ${fem?"קחי":"קח"} עליונית קלה ליתר ביטחון`;
+      return `לטיול: נעליים חמות, ${fem?"לבשי":"לבש"} בשכבות, כובע וכפפות`;
+    } else {
+      if (feel>=26) return `Outdoors: comfortable shoes, light clothing and a hat${uvEn}`;
+      if (feel>=18) return `Outdoors: closed shoes, light-medium clothing${uvEn}`;
+      if (feel>=10) return "Outdoors: closed shoes, mid layer — bring a light jacket just in case";
+      return "Outdoors: warm shoes, dress in layers, hat and gloves";
+    }
+  }
+
+  if (activity === "office") {
+    if (he) {
+      if (feel>=22) return `למשרד: נעליים סגורות ולבוש מקצועי — המזגן עשוי להיות קר, ${fem?"קחי":"קח"} שכבה נוספת`;
+      if (feel>=14) return `למשרד: נעליים סגורות ובגדים עסקיים — ז'קט קל לחדר הממוזג`;
+      if (feel>=8)  return `למשרד: מעיל דק לדרך, נעליים סגורות — בפנים ${fem?"תהיי":"תהיה"} בסדר`;
+      return `למשרד: מעיל חם לדרך ונעליים סגורות — ${fem?"הצטיידי":"הצטייד"} היטב לדרך`;
+    } else {
+      if (feel>=22) return "Office: closed shoes and smart attire — the AC can get cold, bring an extra layer";
+      if (feel>=14) return "Office: closed shoes and business wear — light jacket for the AC";
+      if (feel>=8)  return "Office: light coat for the commute, closed shoes — you'll be fine inside";
+      return "Office: warm coat and closed shoes — bundle up for the commute";
+    }
+  }
+  return "";
+}
+
 // ─── RESULT CARD ──────────────────────────────────────────────────────────────
 function ResultCard({ result, onChangCity, lang, email, gender, activityType, onActivityChange, onRateSubmit, onSkyChange }: {
   result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; gender?:string;
@@ -570,10 +624,8 @@ function ResultCard({ result, onChangCity, lang, email, gender, activityType, on
   const [ratingDir,setRatingDir]=useState<{today?:string;tomorrow?:string}>({});
   const [copied,setCopied]=useState(false);
 
-  const activityOffset = activityType==="sports"?-3:activityType==="outdoor"?1:0;
   const dayData=activeDay==="today"?result.today:result.tomorrow;
-  const baseFeel=activeDay==="today"?result.todayFeel:result.tomorrowFeel;
-  const feel=baseFeel+activityOffset;
+  const feel=activeDay==="today"?result.todayFeel:result.tomorrowFeel;
   const sky=getSkyTheme(feel);
   const _now=new Date(); const _tom=new Date(); _tom.setDate(_tom.getDate()+1);
   const _loc=lang==="he"?"he-IL":"en-US";
@@ -627,17 +679,33 @@ function ResultCard({ result, onChangCity, lang, email, gender, activityType, on
       </div>
 
       {/* Activity selector */}
-      <div style={{ display:"flex", gap:6, marginBottom:8, justifyContent:"center" }}>
-        {([["office", lang==="he"?"🏢 משרד":"🏢 Office"], ["outdoor", lang==="he"?"🌿 בחוץ":"🌿 Outdoor"], ["sports", lang==="he"?"🏃 ספורט":"🏃 Sport"]] as ["office"|"outdoor"|"sports", string][]).map(([key,label])=>(
-          <button key={key} onClick={()=>onActivityChange(activityType===key?null:key)}
-            style={{ padding:"5px 13px", borderRadius:20, border:"1.5px solid",
-              borderColor:activityType===key?"rgba(255,255,255,0.9)":"rgba(255,255,255,0.25)",
-              background:activityType===key?"rgba(255,255,255,0.95)":"rgba(255,255,255,0.08)",
-              color:activityType===key?"#1e3a6e":"rgba(255,255,255,0.75)",
-              fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ marginBottom:8 }}>
+        <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", textAlign:"center", marginBottom:6, letterSpacing:"0.04em" }}>
+          {lang==="he"?"לאן אתה הולך היום?":"Where are you headed today?"}
+        </div>
+        <div style={{ display:"flex", gap:6, justifyContent:"center" }}>
+          {([["office", lang==="he"?"🏢 משרד":"🏢 Office"], ["outdoor", lang==="he"?"🌿 טיול":"🌿 Outdoors"], ["sports", lang==="he"?"🏃 ספורט":"🏃 Sports"]] as ["office"|"outdoor"|"sports", string][]).map(([key,label])=>(
+            <button key={key} onClick={()=>onActivityChange(activityType===key?null:key)}
+              style={{ padding:"6px 14px", borderRadius:20, border:"1.5px solid",
+                borderColor:activityType===key?"rgba(255,255,255,0.95)":"rgba(255,255,255,0.22)",
+                background:activityType===key?"rgba(255,255,255,0.95)":"rgba(255,255,255,0.08)",
+                color:activityType===key?"#1e3a6e":"rgba(255,255,255,0.75)",
+                fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {activityType && (()=>{
+          const hourly = activeDay==="today"?result.todayHourly:result.tomorrowHourly;
+          const hData = hourly?.find(h=>h.localHour===selHour)||null;
+          const uvNow = hData?.uv ?? dayData.uv;
+          const actRec = getActivityRec(activityType, feel, lang, uvNow, gender);
+          return actRec ? (
+            <div style={{ marginTop:8, padding:"10px 14px", background:"rgba(255,255,255,0.12)", borderRadius:12, fontSize:13, color:"rgba(255,255,255,0.92)", lineHeight:1.6, textAlign:"center" }}>
+              {actRec}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {/* Sky hero */}
