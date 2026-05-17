@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
 
   const weatherRes = await fetch(
     `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+    `&current=temperature_2m,weather_code,is_day` +
     `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,wind_speed_10m_max` +
     `&hourly=temperature_2m,weather_code,is_day,uv_index,wind_speed_10m` +
     `&timezone=auto&forecast_days=2`,
@@ -71,5 +72,8 @@ export async function POST(req: NextRequest) {
     cityHe: name,
     todayHourly: makeHourly(0),
     tomorrowHourly: makeHourly(1),
+    currentTemp: Math.round(w.current?.temperature_2m ?? d.temperature_2m_min[0]),
+    currentCode: w.current?.weather_code ?? 0,
+    currentIsDay: (w.current?.is_day ?? 1) === 1,
   });
 }

@@ -387,6 +387,7 @@ type WeatherResult = {
   todayDateStr:string; tomorrowDateStr:string;
   todayHourly:HourData[]; tomorrowHourly:HourData[];
   feelOffset:number;
+  currentTemp:number; currentCode:number; currentIsDay:boolean;
 };
 
 // ─── WEATHER SVG ICONS ────────────────────────────────────────────────────────
@@ -556,8 +557,10 @@ function HourlyStrip({ hourly, feelOffset, lang, currentHour, selHour, onHourSel
 }
 
 // ─── RESULT CARD ──────────────────────────────────────────────────────────────
-function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, onSkyChange }: {
-  result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; gender?:string; onRateSubmit:(d:"today"|"tomorrow",r:number)=>void; onSkyChange:(sky:SkyTheme)=>void;
+function ResultCard({ result, onChangCity, lang, email, gender, activityType, onActivityChange, onRateSubmit, onSkyChange }: {
+  result:WeatherResult; onChangCity:()=>void; lang:Lang; email:string; gender?:string;
+  activityType:"office"|"outdoor"|"sports"|null; onActivityChange:(a:"office"|"outdoor"|"sports"|null)=>void;
+  onRateSubmit:(d:"today"|"tomorrow",r:number)=>void; onSkyChange:(sky:SkyTheme)=>void;
 }) {
   const t=TR[lang];
   const [activeDay,setActiveDay]=useState<"today"|"tomorrow">("today");
@@ -565,9 +568,12 @@ function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, on
   const [ratings,setRatings]=useState<{today?:number;tomorrow?:number}>({});
   const [rateSaved,setRateSaved]=useState<{today?:boolean;tomorrow?:boolean}>({});
   const [ratingDir,setRatingDir]=useState<{today?:string;tomorrow?:string}>({});
+  const [copied,setCopied]=useState(false);
 
+  const activityOffset = activityType==="sports"?-3:activityType==="outdoor"?1:0;
   const dayData=activeDay==="today"?result.today:result.tomorrow;
-  const feel=activeDay==="today"?result.todayFeel:result.tomorrowFeel;
+  const baseFeel=activeDay==="today"?result.todayFeel:result.tomorrowFeel;
+  const feel=baseFeel+activityOffset;
   const sky=getSkyTheme(feel);
   const _now=new Date(); const _tom=new Date(); _tom.setDate(_tom.getDate()+1);
   const _loc=lang==="he"?"he-IL":"en-US";
@@ -576,6 +582,20 @@ function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, on
 
   useEffect(()=>{ onSkyChange(sky); },[feel]);
   const clothing=getClothingItems(feel);
+
+  async function handleShare() {
+    const dayLabel=activeDay==="today"?(lang==="he"?"היום":"Today"):(lang==="he"?"מחר":"Tomorrow");
+    const pantsLabel=clothing.pants==="short"?t.pantsShort:t.pantsLong;
+    const shirtLabel=clothing.shirt==="short"?t.shirtShort:t.shirtLong;
+    const shoesLabel=clothing.shoes==="flip"?t.shoesFlip:clothing.shoes==="sandals"?t.shoesSandals:t.shoesClosed;
+    const text=lang==="he"
+      ?`${dayLabel} ב${result.cityHe}: תחושה ${feel}°\nללבוש: ${t.pants} ${pantsLabel} · ${t.shirt} ${shirtLabel} · ${t.shoes} ${shoesLabel}${clothing.outer?` · ${clothing.outer==="coat"?t.outerCoat:t.outerLight}`:""}\n\nWhat2wear 🌡️`
+      :`${dayLabel} in ${result.cityHe}: feels ${feel}°\nWear: ${pantsLabel} ${t.pants} · ${shirtLabel} ${t.shirt} · ${shoesLabel} ${t.shoes}${clothing.outer?` · ${clothing.outer==="coat"?t.outerCoat:t.outerLight}`:""}\n\nWhat2wear 🌡️`;
+    try {
+      if (navigator.share) { await navigator.share({ text, url: window.location.origin }); }
+      else { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(()=>setCopied(false),2500); }
+    } catch {}
+  }
 
   async function submitRating(v:number) {
     setRatings(r=>({...r,[activeDay]:v})); setRateSaved(s=>({...s,[activeDay]:true}));
@@ -596,12 +616,26 @@ function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, on
   return (
     <div style={{ animation:"fadeUp .4s cubic-bezier(.23,1,.32,1) both" }}>
       {/* Day tabs */}
-      <div style={{ display:"flex", gap:6, marginBottom:10, background:"rgba(255,255,255,0.15)", borderRadius:14, padding:4 }}>
+      <div style={{ display:"flex", gap:6, marginBottom:8, background:"rgba(255,255,255,0.15)", borderRadius:14, padding:4 }}>
         {(["today","tomorrow"] as const).map(d=>(
           <button key={d} onClick={()=>setActiveDay(d)} style={{ flex:1, padding:"9px", border:"none", borderRadius:10, cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600, transition:"all .2s", letterSpacing:"0.01em",
             background:activeDay===d?C.card:"transparent", color:activeDay===d?C.text:"rgba(255,255,255,0.65)",
             boxShadow:activeDay===d?"0 2px 8px rgba(0,0,0,0.12)":"none" }}>
             {d==="today"?t.todayTab:t.tomorrowTab}
+          </button>
+        ))}
+      </div>
+
+      {/* Activity selector */}
+      <div style={{ display:"flex", gap:6, marginBottom:8, justifyContent:"center" }}>
+        {([["office", lang==="he"?"🏢 משרד":"🏢 Office"], ["outdoor", lang==="he"?"🌿 בחוץ":"🌿 Outdoor"], ["sports", lang==="he"?"🏃 ספורט":"🏃 Sport"]] as ["office"|"outdoor"|"sports", string][]).map(([key,label])=>(
+          <button key={key} onClick={()=>onActivityChange(activityType===key?null:key)}
+            style={{ padding:"5px 13px", borderRadius:20, border:"1.5px solid",
+              borderColor:activityType===key?"rgba(255,255,255,0.9)":"rgba(255,255,255,0.25)",
+              background:activityType===key?"rgba(255,255,255,0.95)":"rgba(255,255,255,0.08)",
+              color:activityType===key?"#1e3a6e":"rgba(255,255,255,0.75)",
+              fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all .2s" }}>
+            {label}
           </button>
         ))}
       </div>
@@ -618,6 +652,15 @@ function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, on
               <div style={{ fontSize:17, fontWeight:700, color:i===3?"#1e3a6e":C.text }}>{v}</div>
             </div>
           ))}
+          {activeDay==="today" && (
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" as const, color:C.textMuted, marginBottom:4 }}>{lang==="he"?"עכשיו":"Now"}</div>
+              <div style={{ fontSize:17, fontWeight:700, color:"#059669", display:"flex", alignItems:"center", justifyContent:"center", gap:2 }}>
+                <WeatherIcon code={result.currentCode} isDay={result.currentIsDay} size={14}/>
+                {result.currentTemp}°
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -678,9 +721,14 @@ function ResultCard({ result, onChangCity, lang, email, gender, onRateSubmit, on
         )}
       </Card>
 
-      <button onClick={onChangCity} style={{ width:"100%", padding:"11px", background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:12, color:"rgba(255,255,255,0.65)", fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all .2s", letterSpacing:"0.02em" }}>
-        {t.changeCity}
-      </button>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={onChangCity} style={{ flex:1, padding:"11px", background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:12, color:"rgba(255,255,255,0.65)", fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all .2s", letterSpacing:"0.02em" }}>
+          {t.changeCity}
+        </button>
+        <button onClick={handleShare} style={{ padding:"11px 18px", background:"rgba(255,255,255,0.12)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:12, color:"rgba(255,255,255,0.65)", fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all .2s", whiteSpace:"nowrap" as const }}>
+          {copied?(lang==="he"?"הועתק ✓":"Copied ✓"):(lang==="he"?"שתף":"Share")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -743,6 +791,27 @@ function AdminPanel() {
   );
 }
 
+function MyStats({ email, lang }: { email:string; lang:Lang }) {
+  const [stats,setStats]=useState<{total:number;avgRating:number;streak:number}|null>(null);
+  useEffect(()=>{
+    fetch(`/api/ratings/my-stats?email=${encodeURIComponent(email)}`,{cache:"no-store"}).then(r=>r.json()).then(setStats).catch(()=>{});
+  },[email]);
+  if (!stats || stats.total===0) return null;
+  const stars="★".repeat(Math.round(stats.avgRating))+"☆".repeat(5-Math.round(stats.avgRating));
+  return (
+    <div style={{ marginTop:20, padding:"14px 16px", background:"#f0f9ff", borderRadius:14, border:"1px solid #bae6fd" }}>
+      <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" as const, color:"#0ea5e9", marginBottom:10 }}>
+        {lang==="he"?"ביצועים שלי":"My Performance"}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, textAlign:"center" }}>
+        <div><div style={{ fontSize:22, fontWeight:800, color:"#0369a1" }}>{stats.total}</div><div style={{ fontSize:10, color:"#64748b" }}>{lang==="he"?"דירוגים":"Ratings"}</div></div>
+        <div><div style={{ fontSize:14, fontWeight:700, color:"#f59e0b" }}>{stars}</div><div style={{ fontSize:10, color:"#64748b", marginTop:2 }}>{stats.avgRating>0?`${stats.avgRating}/5`:""}</div></div>
+        <div><div style={{ fontSize:22, fontWeight:800, color:"#0369a1" }}>{stats.streak}</div><div style={{ fontSize:10, color:"#64748b" }}>{lang==="he"?"ימים רצוף":"Day streak"}</div></div>
+      </div>
+    </div>
+  );
+}
+
 function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfile; lang:Lang; onClose:()=>void; onSaved:(p:UserProfile)=>void }) {
   const t=TR[lang];
   const isAdmin=profile.email==="ofek@zewize.com";
@@ -784,7 +853,8 @@ function ProfileDrawer({ profile, lang, onClose, onSaved }: { profile:UserProfil
                 <div style={{ fontSize:14, color:C.text }}>{v}</div>
               </div>
             ))}
-            <button onClick={()=>setEditing(true)} style={{ width:"100%", marginTop:20, padding:"12px", background:"#1e3a6e", border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+            <MyStats email={profile.email} lang={lang}/>
+            <button onClick={()=>setEditing(true)} style={{ width:"100%", marginTop:16, padding:"12px", background:"#1e3a6e", border:"none", borderRadius:12, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
               {t.editProfile}
             </button>
             {isAdmin && <AdminPanel/>}
@@ -847,6 +917,7 @@ export default function App() {
   const [sideMenuOpen,setSideMenuOpen]=useState(false);
   const [changingCity,setChangingCity]=useState(false);
   const [activeSky,setActiveSky]=useState<SkyTheme>(getSkyTheme(20));
+  const [activityType,setActivityType]=useState<"office"|"outdoor"|"sports"|null>(null);
 
   const setF=(k:string)=>(v:string)=>{setForm(f=>({...f,[k]:v}));setErrors(e=>({...e,[k]:""}));setGlobalError("");};
 
@@ -854,6 +925,10 @@ export default function App() {
     const saved=localStorage.getItem("tw_email");
     const savedLang=localStorage.getItem("tw_lang") as Lang|null;
     if (savedLang) setLang(savedLang);
+    const savedActivity=localStorage.getItem("tw_activity");
+    const savedActivityDate=localStorage.getItem("tw_activity_date");
+    const today=new Date().toISOString().split("T")[0];
+    if (savedActivity && savedActivityDate===today) setActivityType(savedActivity as "office"|"outdoor"|"sports");
     if (saved) {
       fetch(`/api/users/get?email=${encodeURIComponent(saved)}`).then(r=>r.json()).then(data=>{
         if (data?.email){ setProfile(data); setEmail(saved); setView("weather"); setTimeout(()=>fetchWeatherForProfile(data),100); }
@@ -939,7 +1014,8 @@ export default function App() {
         todayFeel, tomorrowFeel:weather.tomorrow.avg+offset,
         todayDateStr:now.toLocaleDateString(loc,opts), tomorrowDateStr:tom.toLocaleDateString(loc,opts),
         todayHourly:weather.todayHourly||[], tomorrowHourly:weather.tomorrowHourly||[],
-        feelOffset:offset });
+        feelOffset:offset,
+        currentTemp:weather.currentTemp??weather.today.avg, currentCode:weather.currentCode??0, currentIsDay:weather.currentIsDay??true });
     }catch(e:unknown){setGlobalError(e instanceof Error?e.message:t.weatherError);}
     finally{setLoading(false);setLoadingMsg("");}
   }
@@ -954,6 +1030,11 @@ export default function App() {
     finally{setLocLoading(false);}
   }
 
+  function changeActivity(a:"office"|"outdoor"|"sports"|null){
+    setActivityType(a);
+    if(a){localStorage.setItem("tw_activity",a);localStorage.setItem("tw_activity_date",new Date().toISOString().split("T")[0]);}
+    else{localStorage.removeItem("tw_activity");localStorage.removeItem("tw_activity_date");}
+  }
   function signOut(){localStorage.removeItem("tw_email");setProfile(null);setEmail("");setOtp("");setResult(null);setForm(EMPTY);setCity("");setView("auth_email");}
 
   const LoadingCard = (
@@ -1106,7 +1187,7 @@ export default function App() {
         {/* ── WEATHER ── */}
         {view==="weather"&&profile&&(
           result ? (
-            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);setActiveSky(getSkyTheme(20));}} lang={lang} email={email} gender={profile.gender} onRateSubmit={()=>{}} onSkyChange={setActiveSky}/>
+            <ResultCard result={result} onChangCity={()=>{setResult(null);setGlobalError("");setChangingCity(true);setActiveSky(getSkyTheme(20));}} lang={lang} email={email} gender={profile.gender} activityType={activityType} onActivityChange={changeActivity} onRateSubmit={()=>{}} onSkyChange={setActiveSky}/>
           ) : loading ? LoadingCard
           : changingCity ? (
             <Card>

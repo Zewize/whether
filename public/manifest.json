@@ -1,0 +1,13 @@
+{
+  "name": "What2wear",
+  "short_name": "What2wear",
+  "description": "המלצת לבוש אישית לפי מזג האוויר",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1b2e",
+  "theme_color": "#1e3a6e",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
